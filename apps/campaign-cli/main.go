@@ -14,19 +14,32 @@ import (
 	"pzlauncher/libs/validation"
 )
 
+const (
+	version     = "v1.0.0"
+	versionDate = "2026-06-04"
+)
+
 func main() {
 	var (
-		runs       = flag.Int("runs", 100, "Total number of sessions to execute")
-		interval   = flag.Duration("interval", 30*time.Second, "Interval between runs")
-		mode       = flag.String("mode", "shadow", "Execution mode: live, chaos, shadow")
-		packages   = flag.Int("packages", 2, "Packages per session")
-		concurrent = flag.Int("concurrent", 3, "Max concurrent sessions")
-		drift      = flag.Float64("drift", 0.10, "Max acceptable drift rate (0-1)")
-		cacheDir   = flag.String("cache", "cache/campaign", "Cache directory")
-		name       = flag.String("name", "default", "Campaign name")
-		infinite   = flag.Bool("infinite", false, "Run until manually stopped (overrides -runs)")
+		runs        = flag.Int("runs", 100, "Total number of sessions to execute")
+		interval    = flag.Duration("interval", 30*time.Second, "Interval between runs")
+		mode        = flag.String("mode", "shadow", "Execution mode: live, chaos, shadow")
+		packages    = flag.Int("packages", 2, "Packages per session")
+		concurrent  = flag.Int("concurrent", 3, "Max concurrent sessions")
+		drift       = flag.Float64("drift", 0.10, "Max acceptable drift rate (0-1)")
+		cacheDir    = flag.String("cache", "cache/campaign", "Cache directory")
+		name        = flag.String("name", "default", "Campaign name")
+		infinite    = flag.Bool("infinite", false, "Run until manually stopped (overrides -runs)")
+		showVersion = flag.Bool("version", false, "Show version")
 	)
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("campaign-cli %s (built %s)\n", version, versionDate)
+		fmt.Println("Platform: pzlauncher v1.0.0")
+		fmt.Println("Status: Core FROZEN, Validation STABLE")
+		os.Exit(0)
+	}
 
 	// Parse mode
 	var execMode validation.ExecutionMode

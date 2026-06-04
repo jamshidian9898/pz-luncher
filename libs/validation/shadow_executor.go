@@ -13,7 +13,7 @@ import (
 type ExecutionMode int
 
 const (
-	ModeChaos ExecutionMode = iota    // Use failure injection
+	ModeChaos  ExecutionMode = iota // Use failure injection
 	ModeLive                        // Use real APIs, no injection
 	ModeShadow                      // Run both, compare results
 )
@@ -63,12 +63,12 @@ func (s *ShadowExecutor) executeChaos(ctx context.Context, exec *contracts.Packa
 	start := time.Now()
 	result, err := s.chaosExecutor.Execute(ctx, exec)
 	duration := time.Since(start)
-	
+
 	// Record telemetry
 	if result != nil {
 		s.telemetry.RecordChaosRun(result.PackageID, duration, err, result.State)
 	}
-	
+
 	return result, err
 }
 
@@ -77,12 +77,12 @@ func (s *ShadowExecutor) executeLive(ctx context.Context, exec *contracts.Packag
 	start := time.Now()
 	result, err := s.realExecutor.Execute(ctx, exec)
 	duration := time.Since(start)
-	
+
 	// Record telemetry
 	if result != nil {
 		s.telemetry.RecordLiveRun(result.PackageID, duration, err, result.State)
 	}
-	
+
 	return result, err
 }
 
@@ -90,17 +90,17 @@ func (s *ShadowExecutor) executeLive(ctx context.Context, exec *contracts.Packag
 func (s *ShadowExecutor) executeShadow(ctx context.Context, exec *contracts.PackageExecution) (*contracts.PackageExecution, error) {
 	// Clone the execution for chaos run
 	chaosExec := cloneExecution(exec)
-	
+
 	// Run live (non-blocking for comparison)
 	liveStart := time.Now()
 	liveResult, liveErr := s.realExecutor.Execute(ctx, exec)
 	liveDuration := time.Since(liveStart)
-	
+
 	// Run chaos
 	chaosStart := time.Now()
 	chaosResult, chaosErr := s.chaosExecutor.Execute(ctx, chaosExec)
 	chaosDuration := time.Since(chaosStart)
-	
+
 	// Record both
 	if liveResult != nil {
 		s.telemetry.RecordLiveRun(liveResult.PackageID, liveDuration, liveErr, liveResult.State)
@@ -108,13 +108,13 @@ func (s *ShadowExecutor) executeShadow(ctx context.Context, exec *contracts.Pack
 	if chaosResult != nil {
 		s.telemetry.RecordChaosRun(chaosResult.PackageID, chaosDuration, chaosErr, chaosResult.State)
 	}
-	
+
 	// Compare and detect drift
 	drift := s.comparator.Compare(liveResult, chaosResult, liveDuration, chaosDuration)
 	if drift.HasDrift {
 		s.telemetry.RecordDrift(drift)
 	}
-	
+
 	// Return live result as "source of truth"
 	return liveResult, liveErr
 }
@@ -131,17 +131,28 @@ func (s *ShadowExecutor) GetTelemetry() *TelemetryReport {
 
 // cloneExecution creates a deep copy for shadow comparison
 func cloneExecution(exec *contracts.PackageExecution) *contracts.PackageExecution {
+	// Deep copy ProviderDecision to avoid shared state issues
+	var decisionCopy *contracts.ProviderDecision
+	if exec.ProviderDecision != nil {
+		decisionCopy = &contracts.ProviderDecision{
+			AvailableProviders: exec.ProviderDecision.AvailableProviders,
+			ChosenProvider:     exec.ProviderDecision.ChosenProvider,
+			SelectionReason:    exec.ProviderDecision.SelectionReason,
+			Confidence:         exec.ProviderDecision.Confidence,
+		}
+	}
+
 	return &contracts.PackageExecution{
 		PackageID:        exec.PackageID,
-		ProviderDecision:   exec.ProviderDecision,
-		State:              exec.State,
-		StartedAt:          exec.StartedAt,
-		CompletedAt:        exec.CompletedAt,
-		DurationMs:         exec.DurationMs,
-		BytesDownloaded:    exec.BytesDownloaded,
-		BytesTotal:         exec.BytesTotal,
-		Error:              exec.Error,
-		Attempts:           exec.Attempts,
-		CachePath:          exec.CachePath,
+		ProviderDecision: decisionCopy,
+		State:            exec.State,
+		StartedAt:        exec.StartedAt,
+		CompletedAt:      exec.CompletedAt,
+		DurationMs:       exec.DurationMs,
+		BytesDownloaded:  exec.BytesDownloaded,
+		BytesTotal:       exec.BytesTotal,
+		Error:            exec.Error,
+		Attempts:         exec.Attempts,
+		CachePath:        exec.CachePath,
 	}
 }

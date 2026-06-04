@@ -79,6 +79,18 @@ go run apps/validation-cli/main.go -mode=shadow
 go run apps/validation-cli/main.go -compare
 ```
 
+### Campaign CLI
+```bash
+# Check version
+go run apps/campaign-cli/main.go -version
+
+# Run validation campaign
+go run apps/campaign-cli/main.go \
+  -runs=100 \
+  -mode=shadow \
+  -name=v1.0-validation
+```
+
 ### Extended Validation Campaign
 ```bash
 # 100-session validation

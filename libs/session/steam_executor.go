@@ -37,6 +37,8 @@ type SteamExecutor struct {
 	RetryDelay      time.Duration
 	RetryBudget     int
 	Progress        ProgressCallback
+	mode            SteamExecutorMode
+	fixtureRegistry *FixtureRegistry
 }
 
 // NewSteamExecutor creates a new Steam executor with sensible defaults
@@ -112,7 +114,26 @@ func (e *SteamExecutor) Execute(ctx context.Context, exec *contracts.PackageExec
 		return exec, err
 	}
 
-	// Execute download with retry
+	// Check mode for offline fixtures
+	if e.mode == ModeOfflineFixtures {
+		// Use fixture-based download (no network)
+		startTime := time.Now()
+		err := e.downloadOffline(ctx, workshopID, targetPath, decision.PackageSHA256)
+		if err == nil {
+			exec.State = contracts.PackageStateComplete
+			exec.CompletedAt = time.Now()
+			exec.DurationMs = time.Since(startTime).Milliseconds()
+			exec.CachePath = targetPath
+			exec.Attempts = 1
+			return exec, nil
+		}
+		exec.State = contracts.PackageStateFailed
+		exec.Error = fmt.Sprintf("fixture download failed: %v", err)
+		exec.DurationMs = time.Since(startTime).Milliseconds()
+		return exec, err
+	}
+
+	// Execute download with retry (real network)
 	startTime := time.Now()
 	var lastErr error
 

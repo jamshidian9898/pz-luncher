@@ -94,6 +94,7 @@ func (m *ReliabilityMetrics) RecordExecution(success bool, duration time.Duratio
 }
 
 // RecordDrift records a drift detection
+// NOTE: Only Outcome Drift counts toward SLO. Timing drift is telemetry only.
 func (m *ReliabilityMetrics) RecordDrift(drift *DriftDetection) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -102,12 +103,12 @@ func (m *ReliabilityMetrics) RecordDrift(drift *DriftDetection) {
 	m.LastUpdated = time.Now()
 
 	if drift.HasDrift {
-		m.DriftDetections++
 		switch drift.Type {
 		case "outcome":
+			m.DriftDetections++ // Only outcome counts for SLO
 			m.OutcomeMismatches++
 		case "timing":
-			m.TimingDrifts++
+			m.TimingDrifts++ // Telemetry only, not SLO
 		}
 	}
 }

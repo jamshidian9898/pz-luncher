@@ -1,0 +1,34 @@
+{
+  "comment": "PZ Mod Fixtures for Offline Testing - Real metadata, local files",
+  "fixtures": [
+    {
+      "workshopId": "2200148440",
+      "name": "Brita's Weapon Pack",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "size": 104857600,
+      "fixtureFile": "brita.zip",
+      "description": "Brita Weapon Pack - large weapon mod"
+    },
+    {
+      "workshopId": "2875848298",
+      "name": "Common Sense",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "size": 52428800,
+      "fixtureFile": "commonsense.zip",
+      "description": "Common Sense mod - gameplay improvements"
+    },
+    {
+      "workshopId": "2529746725",
+      "name": "True Music",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "size": 20971520,
+      "fixtureFile": "trumusic.zip",
+      "description": "True Music - custom music system"
+    }
+  ],
+  "usage": {
+    "setup": "Place .zip files in fixtures/ directory",
+    "run": "go run apps/campaign-cli/main.go -mode=shadow -fixtures=fixtures/",
+    "note": "Uses real workshop IDs but local files instead of Steam API"
+  }
+}

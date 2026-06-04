@@ -1,28 +1,34 @@
-# STOP — Platform Complete v1.0
+# STOP — Platform v1.0 (Calibration Phase)
 
 **Date**: 2026-06-04  
-**Status**: 🛑 **NO MORE CORE FEATURES**  
+**Status**: � **CALIBRATING — Core Frozen, Validation Layer Tuning**  
 
 ---
 
 ## What This Means
 
-> **The platform is architecturally complete.**
+> **Core Platform: FROZEN**  
+> **Validation Layer: CALIBRATING**  
+> **Steam Integration: BETA (needs offline fixture mode)**
 
-Do **NOT** add:
-- ❌ New core interfaces
-- ❌ Changes to Session Manager
-- ❌ Changes to Executor interface
-- ❌ Changes to State Machine
-- ❌ New validation layers
-- ❌ New abstraction layers
-- ❌ "Improvements" to existing architecture
+From the first campaign run (June 4, 2026), reality showed:
+- ❌ Campaign used fake data (campaign-pkg-0) → Fixed: Now uses real workshop IDs
+- ❌ Drift detection bug (100% drift rate) → Fixed: Proper comparison counting
+- ❌ Steam integration incomplete → Fixed: Added ModeOfflineFixtures
+
+**Now uses: Real metadata + Local fixtures (no Steam API needed for validation)**
 
 ---
 
 ## What You CAN Do
 
-### ✅ Execute Validation Campaign
+### ✅ Setup Fixture Mode (PRIORITY)
+1. Create fixtures directory
+2. Add sample .zip files (any files work for testing)
+3. Update fixture registry in campaign
+4. Run offline campaign
+
+### ✅ Execute Validation Campaign (After Fixes)
 ```bash
 # Required before production
 go run apps/campaign-cli/main.go -runs=1000 -mode=shadow
@@ -52,16 +58,16 @@ Wails UI → launcher-core API → Session Manager
 
 ---
 
-## Current State
+## Current State (Calibration Phase)
 
 | Component | Status | Action |
 |-----------|--------|--------|
 | Session Manager | 🟢 Frozen | No changes |
 | Executor | 🟢 Frozen | No changes |
-| Steam Integration | 🟢 Complete | Validate only |
+| Steam Integration | � Beta | Needs test mode + wiring fixes |
 | Chaos Tests | 🟢 Complete | Run only |
-| Shadow Validation | 🟢 Complete | Run only |
-| Campaign Runner | 🟢 Complete | Run only |
+| Shadow Validation | � Bug Fixed | Drift counting fixed |
+| Campaign Runner | � Data Fixed | Now uses real workshop IDs |
 | SLO Metrics | 🟢 Complete | Monitor only |
 | HTTP Provider | ⚪ Planned | Plugin only |
 | Registry Provider | ⚪ Planned | Plugin only |

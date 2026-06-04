@@ -39,6 +39,9 @@ type Campaign struct {
 	wg      sync.WaitGroup
 	mu      sync.RWMutex
 	running bool
+
+	// Global session counter for unique indexing
+	sessionCounter int64
 }
 
 // CampaignConfig defines validation parameters
@@ -161,13 +164,31 @@ func (c *Campaign) setup() error {
 	os.MkdirAll(sessionsDir, 0755)
 	c.sessionMgr = session.NewSimpleManager(sessionsDir)
 
-	// Create executors
-	realExec := session.NewSteamExecutor(c.cacheDir)
-	if steamcmdPath := session.FindSteamCMD(); steamcmdPath != "" {
-		realExec.WithSteamCMD(steamcmdPath)
+	// Create fixture registry for offline mode
+	fixturesDir := filepath.Join(c.cacheDir, "fixtures")
+	os.MkdirAll(fixturesDir, 0755)
+	fixtureRegistry := session.NewFixtureRegistry(fixturesDir)
+
+	// Register real PZ workshop IDs as fixtures
+	for _, pkg := range realTestPackages {
+		fixtureRegistry.Register(session.FixturePackage{
+			WorkshopID:  pkg.WorkshopID,
+			Name:        "Mod " + pkg.PackageID,
+			SHA256:      pkg.SHA256,
+			Size:        1024000,
+			FixtureFile: pkg.WorkshopID + ".zip",
+		})
 	}
 
-	chaosExec := session.NewSteamExecutor(c.cacheDir)
+	// Create executors in offline fixture mode
+	realExec := session.NewSteamExecutor(c.cacheDir).
+		WithMode(session.ModeOfflineFixtures).
+		WithFixtures(fixtureRegistry)
+
+	chaosExec := session.NewSteamExecutor(c.cacheDir).
+		WithMode(session.ModeOfflineFixtures).
+		WithFixtures(fixtureRegistry)
+
 	injector := session.NewFailureInjector()
 	injector.PresetChaosMode()
 	chaosExec.WithFailureInjector(injector)
@@ -187,6 +208,15 @@ func (c *Campaign) worker(id int) {
 	ticker := time.NewTicker(c.Config.Interval)
 	defer ticker.Stop()
 
+	// Calculate per-worker allocation once
+	perWorker := 0
+	if c.Config.TotalRuns > 0 {
+		perWorker = (c.Config.TotalRuns + c.Config.MaxConcurrent - 1) / c.Config.MaxConcurrent
+		if perWorker < 1 {
+			perWorker = 1
+		}
+	}
+
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -194,13 +224,27 @@ func (c *Campaign) worker(id int) {
 			return
 
 		case <-ticker.C:
-			// Check if we've reached total runs
-			if c.Config.TotalRuns > 0 && runCount >= c.Config.TotalRuns/c.Config.MaxConcurrent {
+			// Check if we've reached total runs using global counter
+			c.mu.Lock()
+			currentCount := c.sessionCounter
+			c.mu.Unlock()
+			if c.Config.TotalRuns > 0 && int(currentCount) >= c.Config.TotalRuns {
 				return
 			}
 
 			// Execute a session
-			if err := c.executeSession(runCount); err != nil {
+			// Fix: use atomic counter for unique global index
+			c.mu.Lock()
+			globalIndex := c.sessionCounter
+			c.sessionCounter++
+			c.mu.Unlock()
+
+			// Check if we've reached total runs
+			if c.Config.TotalRuns > 0 && int(globalIndex) >= c.Config.TotalRuns {
+				return
+			}
+
+			if err := c.executeSession(int(globalIndex)); err != nil {
 				log.Printf("[Campaign] Worker %d: session error: %v", id, err)
 			}
 
@@ -211,6 +255,18 @@ func (c *Campaign) worker(id int) {
 
 // executeSession runs a single validation session
 func (c *Campaign) executeSession(index int) error {
+	log.Printf("[Campaign] executeSession START: index=%d", index)
+
+	// Ensure setup completed
+	if c.shadowExec == nil {
+		log.Printf("[Campaign] ERROR: shadowExec is nil")
+		return fmt.Errorf("shadow executor not initialized - call Start() first")
+	}
+	if c.sessionMgr == nil {
+		log.Printf("[Campaign] ERROR: sessionMgr is nil")
+		return fmt.Errorf("session manager not initialized - call Start() first")
+	}
+
 	sessionID := fmt.Sprintf("%s-%d-%d", c.Name, time.Now().Unix(), index)
 
 	// Generate test packages
@@ -247,21 +303,22 @@ func (c *Campaign) executeSession(index int) error {
 	return nil
 }
 
-// generateTestPackages creates test data
+// Real PZ mod workshop IDs for testing (numeric IDs resolve directly)
+var realTestPackages = []CampaignTestPackage{
+	{PackageID: "2200148440", WorkshopID: "2200148440", SHA256: "", ShouldSucceed: false},
+	{PackageID: "2875848298", WorkshopID: "2875848298", SHA256: "", ShouldSucceed: false},
+	{PackageID: "2529746725", WorkshopID: "2529746725", SHA256: "", ShouldSucceed: false},
+	{PackageID: "1911132112", WorkshopID: "1911132112", SHA256: "", ShouldSucceed: false},
+	{PackageID: "2657661246", WorkshopID: "2657661246", SHA256: "", ShouldSucceed: false},
+}
+
+// generateTestPackages creates test data using REAL workshop IDs
 func (c *Campaign) generateTestPackages() []CampaignTestPackage {
-	packages := []CampaignTestPackage{}
-
-	for i := 0; i < c.Config.PackagesPerRun; i++ {
-		pkg := CampaignTestPackage{
-			PackageID:     fmt.Sprintf("campaign-pkg-%d", i),
-			WorkshopID:    fmt.Sprintf("%d", 100000000+i),
-			SHA256:        fmt.Sprintf("%064d", i),
-			ShouldSucceed: true,
-		}
-		packages = append(packages, pkg)
+	count := c.Config.PackagesPerRun
+	if count > len(realTestPackages) {
+		count = len(realTestPackages)
 	}
-
-	return packages
+	return realTestPackages[:count]
 }
 
 // createDecisions converts packages to provider decisions
