@@ -4,3 +4,31 @@ node_modules/
 *.log
 *.swp
 .vscode/
+
+# Cache directories
+cache/
+tmp/
+temp/
+*.tmp
+
+# Build artifacts
+/tmp/
+/build/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.out
+
+# IDE
+.idea/
+*.iml
+
+# OS
+Thumbs.db
+
