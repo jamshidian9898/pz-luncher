@@ -59,7 +59,7 @@ This file tracks the current state of repository scaffolding, documentation, and
 - Contracts: 90%
 - Shared libraries: 75%
 - Services: 0%
-- Launcher Core: 45% (execution engine hardened, Steam integration production-ready)
+- Launcher Core: 50% (execution kernel verified with chaos + shadow validation)
 - UI: 0%
 
 ### Recent engineering progress (Phase 3 — Platform Grade)
@@ -75,12 +75,18 @@ This file tracks the current state of repository scaffolding, documentation, and
     - `libs/session/ratelimit.go`: Token bucket rate limiter (configurable for Steam API limits)
     - `libs/session/failure_inject.go`: **Chaos testing framework** — simulates real-world failures
     - `libs/session/progress.go`: Internal progress event streaming (bytes, speed, percent)
-  - **Chaos Validation Suite** — System-level testing framework:
+  - **Chaos Validation Suite** — Controlled failure testing:
     - `libs/chaos/scenario.go`: Chaos test scenarios with controlled failure injection
     - `libs/chaos/runner.go`: Scenario execution engine with expectation validation
     - `libs/chaos/replay.go`: Deterministic replay engine for behavior validation
     - `apps/chaos-cli/main.go`: CLI tool for running chaos tests
     - **5 Preset Scenarios**: flaky network, Steam API down, hash mismatch, partial download, retry exhaustion
+  - **Shadow Validation Layer** — Real-world vs simulation comparison:
+    - `libs/validation/shadow_executor.go`: Dual-mode executor (live/chaos/shadow)
+    - `libs/validation/drift.go`: Drift detection between live and chaos results
+    - `libs/validation/telemetry.go`: Real-world telemetry collection
+    - `apps/validation-cli/main.go`: CLI for live validation and drift detection
+    - **Features**: ModeLive (real APIs), ModeChaos (failure injection), ModeShadow (compare both)
   - **Reliability Features**:
     - Workshop ID mapping with local cache and registry fallback
     - Rate limiting (10 tokens, 1 req/sec refill for Steam API)
@@ -116,13 +122,14 @@ This file tracks the current state of repository scaffolding, documentation, and
 
 ## Future work items
 
-### Next: Execute Chaos Validation Suite (Current Phase)
-- Run: `go run apps/chaos-cli/main.go -list` to see scenarios.
-- Run: `go run apps/chaos-cli/main.go` to execute full chaos suite.
-- Run: `go run apps/chaos-cli/main.go -record` to record baselines.
-- Run: `go run apps/chaos-cli/main.go -replay` to verify determinism.
-- Validate all 5 preset scenarios pass.
-- Confirm determinism report shows >=80% pass rate.
+### Next: Execute Shadow Validation (Current Phase)
+- Run: `go run apps/validation-cli/main.go -mode=live` - Test against real Steam
+- Run: `go run apps/validation-cli/main.go -mode=chaos` - Test with failure injection
+- Run: `go run apps/validation-cli/main.go -mode=shadow` - Compare live vs chaos
+- Run: `go run apps/validation-cli/main.go -compare` - Detailed comparison
+- Validate drift rate < 10% between live and chaos
+- Confirm real-world behavior matches simulation expectations
+- Document any significant drifts for investigation
 
 ### After Steam: HTTP/Registry Providers
 - Clone SteamExecutor pattern for HTTP downloads.
