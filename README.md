@@ -1,6 +1,14 @@
 # Project Zomboid Launcher
 
-This repository is a monorepo scaffold for a universal Project Zomboid launcher and mod ecosystem.
+> **🛑 STOP — Platform v1.0 Architecturally Complete**  
+> **Status**: Pending validation (see `STOP.md`)  
+> **Next**: Execute extended campaign, prove SLOs  
+> **See**: `FINAL_SUMMARY.md` for complete status
+
+---
+
+This repository is a monorepo for a universal Project Zomboid launcher and mod ecosystem.
+**Current focus**: Execution platform validation, not feature development.
 
 The goal is to support:
 - Server discovery and one-click join

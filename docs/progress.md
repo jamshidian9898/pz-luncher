@@ -127,14 +127,34 @@ This file tracks the current state of repository scaffolding, documentation, and
 
 ## Future work items
 
-### Next: Execute Extended Validation Campaign (Current Phase)
-- ⏳ Run: `go run apps/campaign-cli/main.go -runs=100` — 100 session validation
-- ⏳ Run: `go run apps/campaign-cli/main.go -infinite` — Continuous until stopped
-- ⏳ Run: `go run apps/campaign-cli/main.go -mode=shadow` — Shadow comparison
-- ⏳ Verify: SLOs met (availability ≥99%, success ≥95%, drift <10%)
-- ⏳ Collect: Reliability metrics and failure distribution
-- ⏳ Document: Campaign results and production readiness
-- ✅ Plugin guide: HTTP/Registry = **plugins only** (no core changes)
+### 🛑 STOP — Architecture Complete (Current Phase)
+**See**: `STOP.md` for complete freeze notice
+
+#### Phase 1: Validation (REQUIRED)
+- ⏳ Run: `go run apps/campaign-cli/main.go -runs=1000` — 1000 session validation
+- ⏳ Run: `go run apps/campaign-cli/main.go -infinite` — Continuous monitoring
+- ⏳ Verify: SLOs met (availability ≥99%, success ≥95%, drift <10%, P99 <60s)
+- ⏳ Check: Memory leaks, goroutine leaks, retry storms
+- ⏳ Write: Campaign reports (`reports/campaign-*/metrics.json`)
+- ⏳ Document: Production readiness evidence
+
+#### Phase 2: Release (After SLOs Met)
+- ⏳ Tag: v1.0.0
+- ⏳ Release notes
+- ⏳ Production deployment
+- ⏳ Continuous monitoring
+
+#### ❌ What NOT To Do
+- ❌ NO new core features
+- ❌ NO architecture changes
+- ❌ NO "improvements" to frozen interfaces
+- ❌ NO premature optimization
+
+#### ✅ What IS Allowed
+- ✅ Bug fixes only (if found in campaign)
+- ✅ Plugins (HTTP/Registry as new executors)
+- ✅ UI (Wails as consumer of frozen API)
+- ✅ Documentation and reports
 
 ### After Stabilization: HTTP/Registry (Plugins)
 - HTTP Provider = new plugin implementing Executor
