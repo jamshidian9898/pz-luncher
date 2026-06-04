@@ -1,0 +1,81 @@
+openapi: 3.0.3
+info:
+  title: Project Zomboid Registry Service API
+  version: 0.1.0
+paths:
+  /packages:
+    post:
+      summary: Register a package
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Package'
+      responses:
+        '200':
+          description: Package registered
+  /packages/{hash}:
+    get:
+      summary: Get package metadata by hash
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Package metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Package'
+  /packages/{hash}/download:
+    get:
+      summary: Download package blob by hash
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Package content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+components:
+  schemas:
+    Package:
+      type: object
+      properties:
+        id:
+          type: string
+        version:
+          type: string
+        sha256:
+          type: string
+        size:
+          type: integer
+        provider:
+          type: string
+        originUrl:
+          type: string
+        dependencies:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+        - id
+        - version
+        - sha256
+        - size
+        - provider

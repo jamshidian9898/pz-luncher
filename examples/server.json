@@ -1,0 +1,5 @@
+{
+  "name": "Example Server",
+  "manifestUrl": "examples/manifest.json",
+  "serverId": "server-1"
+}

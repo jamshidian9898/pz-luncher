@@ -1,0 +1,106 @@
+openapi: 3.0.3
+info:
+  title: Project Zomboid Manifest Service API
+  version: 0.1.0
+paths:
+  /manifest/{serverId}:
+    get:
+      summary: Get latest manifest for a server
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Manifest
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manifest'
+    post:
+      summary: Publish or update a manifest
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Manifest'
+      responses:
+        '200':
+          description: Manifest published
+  /manifest/{serverId}/{version}:
+    get:
+      summary: Get a specific manifest version
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Manifest
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manifest'
+components:
+  schemas:
+    Manifest:
+      type: object
+      properties:
+        id:
+          type: string
+        serverId:
+          type: string
+        version:
+          type: integer
+        gameVersion:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        checksum:
+          type: string
+        mods:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManifestMod'
+      required:
+        - serverId
+        - version
+        - gameVersion
+        - mods
+    ManifestMod:
+      type: object
+      properties:
+        id:
+          type: string
+        version:
+          type: string
+        sha256:
+          type: string
+        downloadUrl:
+          type: string
+        dependencies:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - version
+        - sha256
+        - downloadUrl

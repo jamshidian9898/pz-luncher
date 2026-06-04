@@ -1,0 +1,99 @@
+openapi: 3.0.3
+info:
+  title: Project Zomboid Directory Service API
+  version: 0.1.0
+paths:
+  /servers:
+    get:
+      summary: List available servers
+      responses:
+        '200':
+          description: Server list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Server'
+  /servers/{id}:
+    get:
+      summary: Get server details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Server details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Server'
+  /heartbeat:
+    post:
+      summary: Send heartbeat update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Heartbeat'
+      responses:
+        '200':
+          description: Heartbeat accepted
+components:
+  schemas:
+    Server:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        region:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        playerCount:
+          type: integer
+        maxPlayers:
+          type: integer
+        status:
+          type: string
+        manifestId:
+          type: string
+        lastHeartbeat:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - status
+    Heartbeat:
+      type: object
+      properties:
+        serverId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: string
+        playerCount:
+          type: integer
+        maxPlayers:
+          type: integer
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+        - serverId
+        - timestamp
+        - status
