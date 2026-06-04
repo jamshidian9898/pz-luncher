@@ -1,14 +1,32 @@
 # Project Zomboid Launcher
 
-> **🛑 STOP — Platform v1.0 Architecturally Complete**  
-> **Status**: Pending validation (see `STOP.md`)  
-> **Next**: Execute extended campaign, prove SLOs  
-> **See**: `FINAL_SUMMARY.md` for complete status
+> **🛑 CRITICAL DECISION POINT**  
+> **See**: `ARCHITECTURAL_DECISION.md` — System has evolved beyond launcher scope  
+> **Required**: Choose between Product Mode or Platform Mode before proceeding  
+> **Status**: Feature development blocked until decision is made
 
 ---
 
-This repository is a monorepo for a universal Project Zomboid launcher and mod ecosystem.
-**Current focus**: Execution platform validation, not feature development.
+## Current Architecture Status
+
+This repository has evolved from a simple launcher into an **event-sourced runtime engine** with production-grade optimization:
+
+- ✅ **RFC-0024**: Event Log + Replay System (audit trail, deterministic reconstruction)
+- ✅ **RFC-0025**: Snapshot + Compaction Engine (10x reconstruction speedup, memory governance)
+- ✅ **RFCs 0001-0023**: Foundation systems (manifests, profiles, contracts, agents)
+
+**The Question**: Is this infrastructure a **product** (launcher) or a **platform** (extensible system)?
+
+See `ARCHITECTURAL_DECISION.md` for:
+- Two possible paths forward (Product vs Platform)
+- Trade-off analysis and decision framework
+- Implementation roadmaps for each path
+- Recommendation: Hybrid approach (launcher first, platform second)
+
+---
+
+This repository is a monorepo for a universal Project Zomboid launcher and mod ecosystem.  
+**Current status**: Architecture validation complete. Awaiting strategic direction.
 
 The goal is to support:
 - Server discovery and one-click join

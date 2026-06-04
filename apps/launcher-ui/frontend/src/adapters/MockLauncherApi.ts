@@ -81,7 +81,7 @@ export class MockLauncherApi implements LauncherApi {
 
     (async () => {
       emit({
-        type: LauncherEventType.SessionStarted,
+        type: LauncherEventType.SessionStart,
         timestamp: now(),
         sessionId,
         payload: { metadata: { serverId } },
@@ -89,23 +89,23 @@ export class MockLauncherApi implements LauncherApi {
       await this.delay(200);
 
       emit({
-        type: LauncherEventType.DownloadStarted,
+        type: LauncherEventType.ModResolveStart,
         timestamp: now(),
         sessionId,
         payload: { packageId: 'resolve' },
       });
       await this.delay(400);
       emit({
-        type: LauncherEventType.TraceUpdated,
+        type: LauncherEventType.ModResolveComplete,
         timestamp: now(),
         sessionId,
-        payload: { metadata: { modCount: mods.length } },
+        payload: { packageId: 'resolve', metadata: { modCount: mods.length } },
       });
       await this.delay(100);
 
       for (const mod of mods) {
         emit({
-          type: LauncherEventType.DownloadStarted,
+          type: LauncherEventType.DownloadStart,
           timestamp: now(),
           sessionId,
           payload: { packageId: mod },
@@ -125,7 +125,7 @@ export class MockLauncherApi implements LauncherApi {
         }
 
         emit({
-          type: LauncherEventType.DownloadCompleted,
+          type: LauncherEventType.DownloadComplete,
           timestamp: now(),
           sessionId,
           payload: { packageId: mod },
@@ -134,7 +134,7 @@ export class MockLauncherApi implements LauncherApi {
       }
 
       emit({
-        type: LauncherEventType.SessionCompleted,
+        type: LauncherEventType.SessionComplete,
         timestamp: now(),
         sessionId,
         payload: { metadata: { ready: true } },

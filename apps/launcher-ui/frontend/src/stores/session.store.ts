@@ -6,6 +6,7 @@ export type LaunchState =
   | 'idle'
   | 'resolving'
   | 'downloading'
+  | 'installing'
   | 'verifying'
   | 'materializing'
   | 'launching'
