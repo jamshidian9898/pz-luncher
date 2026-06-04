@@ -59,7 +59,7 @@ This file tracks the current state of repository scaffolding, documentation, and
 - Contracts: 90%
 - Shared libraries: 75%
 - Services: 0%
-- Launcher Core: 50% (execution kernel verified with chaos + shadow validation)
+- Launcher Core: 55% (platform frozen — reliability metrics + campaign runner ready)
 - UI: 0%
 
 ### Recent engineering progress (Phase 3 — Platform Grade)
@@ -75,18 +75,23 @@ This file tracks the current state of repository scaffolding, documentation, and
     - `libs/session/ratelimit.go`: Token bucket rate limiter (configurable for Steam API limits)
     - `libs/session/failure_inject.go`: **Chaos testing framework** — simulates real-world failures
     - `libs/session/progress.go`: Internal progress event streaming (bytes, speed, percent)
-  - **Chaos Validation Suite** — Controlled failure testing:
+  - **Chaos Validation Suite** — Controlled failure testing (quick validation):
     - `libs/chaos/scenario.go`: Chaos test scenarios with controlled failure injection
     - `libs/chaos/runner.go`: Scenario execution engine with expectation validation
     - `libs/chaos/replay.go`: Deterministic replay engine for behavior validation
     - `apps/chaos-cli/main.go`: CLI tool for running chaos tests
     - **5 Preset Scenarios**: flaky network, Steam API down, hash mismatch, partial download, retry exhaustion
-  - **Shadow Validation Layer** — Real-world vs simulation comparison:
+  - **Shadow Validation Layer** — Live vs simulation comparison:
     - `libs/validation/shadow_executor.go`: Dual-mode executor (live/chaos/shadow)
     - `libs/validation/drift.go`: Drift detection between live and chaos results
     - `libs/validation/telemetry.go`: Real-world telemetry collection
     - `apps/validation-cli/main.go`: CLI for live validation and drift detection
     - **Features**: ModeLive (real APIs), ModeChaos (failure injection), ModeShadow (compare both)
+  - **Extended Validation Campaign** — Long-run reliability testing:
+    - `libs/validation/metrics.go`: SLO/SLI metrics tracking (availability, success rate, drift, latency)
+    - `libs/validation/campaign.go`: Long-run campaign scheduler (100-1000+ sessions)
+    - `apps/campaign-cli/main.go`: CLI for continuous validation campaigns
+    - **SLOs**: Availability ≥99%, Success Rate ≥95%, Drift <10%, P99 Latency <60s
   - **Reliability Features**:
     - Workshop ID mapping with local cache and registry fallback
     - Rate limiting (10 tokens, 1 req/sec refill for Steam API)
@@ -122,19 +127,19 @@ This file tracks the current state of repository scaffolding, documentation, and
 
 ## Future work items
 
-### Next: Execute Shadow Validation (Current Phase)
-- Run: `go run apps/validation-cli/main.go -mode=live` - Test against real Steam
-- Run: `go run apps/validation-cli/main.go -mode=chaos` - Test with failure injection
-- Run: `go run apps/validation-cli/main.go -mode=shadow` - Compare live vs chaos
-- Run: `go run apps/validation-cli/main.go -compare` - Detailed comparison
-- Validate drift rate < 10% between live and chaos
-- Confirm real-world behavior matches simulation expectations
-- Document any significant drifts for investigation
+### Next: Execute Extended Validation Campaign (Current Phase)
+- ⏳ Run: `go run apps/campaign-cli/main.go -runs=100` — 100 session validation
+- ⏳ Run: `go run apps/campaign-cli/main.go -infinite` — Continuous until stopped
+- ⏳ Run: `go run apps/campaign-cli/main.go -mode=shadow` — Shadow comparison
+- ⏳ Verify: SLOs met (availability ≥99%, success ≥95%, drift <10%)
+- ⏳ Collect: Reliability metrics and failure distribution
+- ⏳ Document: Campaign results and production readiness
+- ✅ Plugin guide: HTTP/Registry = **plugins only** (no core changes)
 
-### After Steam: HTTP/Registry Providers
-- Clone SteamExecutor pattern for HTTP downloads.
-- Implement Registry provider for community package registry.
-- Add multi-source download capabilities.
+### After Stabilization: HTTP/Registry (Plugins)
+- HTTP Provider = new plugin implementing Executor
+- Registry Provider = new plugin implementing Executor
+- Multi-source = CompositeExecutor enhancement (within plugin boundary)
 
 ### Later phases:
 - Add service skeletons and API definitions inside `apps/`
