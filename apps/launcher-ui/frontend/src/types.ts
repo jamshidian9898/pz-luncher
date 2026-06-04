@@ -1,4 +1,15 @@
-// Types matching Wails bindings (main.go)
+// Re-export shared contracts; extend with UI-only fields where needed.
+export type {
+  ServerManifest,
+  ModEntry,
+  ServerDescriptor,
+  ServerRegistry,
+  LauncherSettings,
+  LauncherEvent,
+  LauncherEventType,
+} from './contracts/generated';
+
+export { settingsFromLauncher, settingsToLauncher } from './contracts/generated';
 
 export interface ServerInfo {
   id: string;
@@ -39,12 +50,15 @@ export interface SessionStatus {
   errors?: string[];
 }
 
+/** UI settings — maps to LauncherSettings via settingsToLauncher */
 export interface Settings {
+  gamePath: string;
   steamcmdPath: string;
   cacheLocation: string;
   profilesLocation: string;
   maxConcurrent: number;
   bandwidthLimit: number;
+  verifyChecksum: boolean;
 }
 
 export interface Progress {
@@ -55,13 +69,13 @@ export interface Progress {
   eta?: number;
 }
 
-// Wails runtime types
 declare global {
   interface Window {
     go: {
       main: {
         App: {
           JoinServer(serverId: string): Promise<void>;
+          LaunchServer(serverId: string): Promise<void>;
           GetServerList(): Promise<ServerInfo[]>;
           GetServerDetails(serverId: string): Promise<ServerDetails>;
           GetSessionStatus(sessionId: string): Promise<SessionStatus>;

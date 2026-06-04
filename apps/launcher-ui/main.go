@@ -31,6 +31,11 @@ func (a *App) JoinServer(serverID string) error {
 	return a.ui.JoinServer(serverID)
 }
 
+// LaunchServer starts the game after a successful join
+func (a *App) LaunchServer(serverID string) error {
+	return a.ui.LaunchServer(serverID)
+}
+
 // GetServerList returns list of available servers
 func (a *App) GetServerList() []ServerInfo {
 	return a.ui.GetServerList()
@@ -105,13 +110,15 @@ type SessionStatus struct {
 	Errors        []string       `json:"errors,omitempty"`
 }
 
-// Settings for the launcher
+// Settings for the launcher (RFC-0036 — mirrors shared/contracts/settings.schema.json)
 type Settings struct {
-	SteamCMDPath    string `json:"steamcmdPath"`
-	CacheLocation   string `json:"cacheLocation"`
+	GamePath         string `json:"gamePath"`
+	SteamCMDPath     string `json:"steamcmdPath"`
+	CacheLocation    string `json:"cacheLocation"`
 	ProfilesLocation string `json:"profilesLocation"`
 	MaxConcurrent    int    `json:"maxConcurrent"`
-	BandwidthLimit   int    `json:"bandwidthLimit"` // MB/s, 0 = unlimited
+	BandwidthLimit   int    `json:"bandwidthLimit"`
+	VerifyChecksum   bool   `json:"verifyChecksum"`
 }
 
 func main() {

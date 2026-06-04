@@ -3,7 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"sync"
 	"time"
+
+	"pzlauncher/libs/manifestv1"
+	"pzlauncher/libs/pipeline"
+	"pzlauncher/libs/settings"
+	"pzlauncher/libs/sharedtypes"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -11,11 +18,32 @@ import (
 // UIService handles UI business logic
 type UIService struct {
 	ctx context.Context
+	mu  sync.Mutex
+
+	workspaceRoot string
+	pipeline      *pipeline.Service
+
+	lastJoin   *pipeline.JoinResult
+	lastServer string
+	sessions   map[string]*SessionStatus
 }
 
 // NewUIService creates UI service
 func NewUIService() *UIService {
-	return &UIService{}
+	root := pipeline.WorkspaceRoot()
+	st, _ := settings.Load(root)
+	return &UIService{
+		workspaceRoot: root,
+		pipeline:      pipeline.NewService(settings.ToPipelineConfig(root, st)),
+		sessions:      make(map[string]*SessionStatus),
+	}
+}
+
+func (s *UIService) workspaceRoot() string {
+	if s.workspaceRoot != "" {
+		return s.workspaceRoot
+	}
+	return pipeline.WorkspaceRoot()
 }
 
 // SetContext sets Wails context for events
@@ -23,267 +51,303 @@ func (s *UIService) SetContext(ctx context.Context) {
 	s.ctx = ctx
 }
 
-// emitEvent sends event to frontend
 func (s *UIService) emitEvent(event UIEvent) {
 	if s.ctx != nil {
 		application.EventsEmit(s.ctx, "launcher:event", event)
 	}
+	s.updateSessionFromEvent(event)
 }
 
-// JoinServer starts server join flow
+func (s *UIService) pipelineEmit() pipeline.Emitter {
+	return func(ev pipeline.Event) {
+		ui := UIEvent{
+			Type:      mapPipelineEventType(ev.Type),
+			Timestamp: time.Now().Unix(),
+			SessionID: ev.SessionID,
+			PackageID: ev.PackageID,
+			Error:     ev.Error,
+			Metadata:  ev.Metadata,
+		}
+		if ev.Progress != nil {
+			ui.Progress = &Progress{
+				Current: ev.Progress.Current,
+				Total:   ev.Progress.Total,
+				Percent: ev.Progress.Percent,
+				Speed:   ev.Progress.Speed,
+				ETA:     ev.Progress.ETA,
+			}
+		}
+		s.emitEvent(ui)
+	}
+}
+
+func mapPipelineEventType(t string) UIEventType {
+	switch t {
+	case "session.start":
+		return EventSessionStart
+	case "session.complete":
+		return EventSessionComplete
+	case "mod.resolve.start":
+		return EventModResolveStart
+	case "mod.resolve.complete":
+		return EventModResolveComplete
+	case "download.start":
+		return EventDownloadStart
+	case "download.progress":
+		return EventDownloadProgress
+	case "download.complete":
+		return EventDownloadComplete
+	case "install.complete":
+		return EventInstallComplete
+	case "error":
+		return EventError
+	default:
+		return EventTraceUpdated
+	}
+}
+
+func (s *UIService) updateSessionFromEvent(ev UIEvent) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st, ok := s.sessions[ev.SessionID]
+	if !ok {
+		st = &SessionStatus{SessionID: ev.SessionID, State: "resolving", Errors: []string{}}
+		s.sessions[ev.SessionID] = st
+	}
+	switch ev.Type {
+	case EventModResolveStart:
+		st.State = "resolving"
+		st.Progress = 5
+	case EventModResolveComplete:
+		st.State = "resolving"
+		st.Progress = 15
+	case EventDownloadStart:
+		st.State = "downloading"
+		st.CurrentMod = ev.PackageID
+	case EventDownloadProgress:
+		st.State = "downloading"
+		if ev.Progress != nil {
+			st.Progress = float64(ev.Progress.Percent)
+			st.DownloadSpeed = ev.Progress.Speed
+			st.ETA = ev.Progress.ETA
+		}
+	case EventDownloadComplete:
+		st.Progress = 80
+	case EventInstallComplete, EventSessionComplete:
+		st.State = "complete"
+		st.Progress = 100
+		st.CurrentMod = ""
+	case EventError:
+		st.State = "error"
+		if ev.Error != "" {
+			st.Errors = append(st.Errors, ev.Error)
+		}
+	}
+}
+
+// JoinServer runs the real join pipeline (RFC-0033).
 func (s *UIService) JoinServer(serverID string) error {
-	sessionID := fmt.Sprintf("session-%d", time.Now().Unix())
-
-	// Emit start event
-	s.emitEvent(UIEvent{
-		Type:      EventSessionStart,
-		Timestamp: time.Now().Unix(),
-		SessionID: sessionID,
-		Metadata: map[string]interface{}{
-			"serverId": serverID,
-		},
-	})
-
-	// TODO: Integrate with launcher-core session manager
-	// For now, simulate workflow
-
-	go s.simulateSession(sessionID, serverID)
-
+	go func() {
+		ctx := context.Background()
+		emit := s.pipelineEmit()
+		result, err := s.pipeline.RunJoin(ctx, serverID, emit)
+		s.mu.Lock()
+		if err != nil {
+			s.mu.Unlock()
+			return
+		}
+		s.lastJoin = result
+		s.lastServer = serverID
+		s.mu.Unlock()
+	}()
 	return nil
 }
 
-// simulateSession mocks the join flow for UI testing
-func (s *UIService) simulateSession(sessionID, serverID string) {
-	// Phase 1: Resolve mods
-	s.emitEvent(UIEvent{
-		Type:      EventModResolveStart,
-		Timestamp: time.Now().Unix(),
-		SessionID: sessionID,
-	})
-
-	time.Sleep(500 * time.Millisecond)
-
-	s.emitEvent(UIEvent{
-		Type:      EventModResolveComplete,
-		Timestamp: time.Now().Unix(),
-		SessionID: sessionID,
-		Metadata: map[string]interface{}{
-			"modCount": 3,
-		},
-	})
-
-	// Phase 2: Download mods
-	mods := []string{"Brita Weapons", "Common Sense", "True Music"}
-	for i, mod := range mods {
-		s.emitEvent(UIEvent{
-			Type:      EventDownloadStart,
-			Timestamp: time.Now().Unix(),
-			SessionID: sessionID,
-			PackageID: mod,
-		})
-
-		// Simulate progress
-		for progress := 0; progress <= 100; progress += 20 {
-			s.emitEvent(UIEvent{
-				Type:      EventDownloadProgress,
-				Timestamp: time.Now().Unix(),
-				SessionID: sessionID,
-				PackageID: mod,
-				Progress: &Progress{
-					Current: int64(progress),
-					Total:   100,
-					Percent: progress,
-					Speed:   1024 * 1024, // 1 MB/s
-					ETA:     (100 - progress) / 20,
-				},
-			})
-			time.Sleep(100 * time.Millisecond)
-		}
-
-		s.emitEvent(UIEvent{
-			Type:      EventDownloadComplete,
-			Timestamp: time.Now().Unix(),
-			SessionID: sessionID,
-			PackageID: mod,
-			Metadata: map[string]interface{}{
-				"modIndex": i + 1,
-				"totalMods": len(mods),
-			},
-		})
+// LaunchServer launches the game for the last successful join.
+func (s *UIService) LaunchServer(serverID string) error {
+	s.mu.Lock()
+	join := s.lastJoin
+	s.mu.Unlock()
+	if join == nil || !join.Ready {
+		return fmt.Errorf("LAUNCH_PROFILE_NOT_READY: join server first")
 	}
-
-	// Phase 3: Complete
-	s.emitEvent(UIEvent{
-		Type:      EventSessionComplete,
-		Timestamp: time.Now().Unix(),
-		SessionID: sessionID,
-		Metadata: map[string]interface{}{
-			"ready": true,
-		},
-	})
+	if join.Manifest.ServerID != serverID && serverID != "" {
+		return fmt.Errorf("LAUNCH_PROFILE_NOT_READY: no join session for server %s", serverID)
+	}
+	go func() {
+		_ = s.pipeline.Launch(context.Background(), join.Manifest.ServerID, join.ProfilePath, s.pipelineEmit())
+	}()
+	return nil
 }
 
-// GetServerList returns mock servers
+// GetServerList loads servers from examples/servers.json
 func (s *UIService) GetServerList() []ServerInfo {
-	return []ServerInfo{
-		{
-			ID:          "server-1",
-			Name:        "One Life",
-			Description: "Hardcore survival server",
-			PlayerCount: 42,
-			MaxPlayers:  64,
-			Ping:        45,
-			ModCount:    15,
-			Installed:   false,
-			UpToDate:    false,
-		},
-		{
-			ID:          "server-2",
-			Name:        "Casual RP",
-			Description: "Relaxed roleplay server",
-			PlayerCount: 28,
-			MaxPlayers:  128,
-			Ping:        30,
-			ModCount:    8,
-			Installed:   true,
-			UpToDate:    true,
-		},
-		{
-			ID:          "server-3",
-			Name:        "PvP Arena",
-			Description: "Player vs player combat",
-			PlayerCount: 15,
-			MaxPlayers:  32,
-			Ping:        60,
-			ModCount:    5,
-			Installed:   true,
-			UpToDate:    false,
-		},
+	reg, err := manifestv1.LoadRegistry(filepath.Join(s.workspaceRoot(), "examples", "servers.json"))
+	if err != nil {
+		return fallbackServerList()
 	}
+	out := make([]ServerInfo, 0, len(reg.Servers))
+	for _, d := range reg.Servers {
+		modCount := 0
+		if m, err := s.loadManifestForDescriptor(&d); err == nil {
+			modCount = len(m.Mods)
+		}
+		out = append(out, ServerInfo{
+			ID:          d.ID,
+			Name:        d.Name,
+			Description: d.Description,
+			PlayerCount: d.PlayerCount,
+			MaxPlayers:  d.MaxPlayers,
+			Ping:        d.Ping,
+			ModCount:    modCount,
+		})
+	}
+	return out
 }
 
-// GetServerDetails returns detailed info
+func fallbackServerList() []ServerInfo {
+	return []ServerInfo{{
+		ID: "demo-survival", Name: "Demo Survival", Description: "Offline demo",
+		PlayerCount: 0, MaxPlayers: 32, Ping: 0, ModCount: 1,
+	}}
+}
+
+func (s *UIService) loadManifestForDescriptor(d *manifestv1.ServerDescriptor) (*manifestv1.ServerManifest, error) {
+	return manifestv1.LoadFile(filepath.Join(s.workspaceRoot(), d.ManifestPath))
+}
+
+// GetServerDetails returns manifest-driven mod list
 func (s *UIService) GetServerDetails(serverID string) (*ServerDetails, error) {
-	servers := s.GetServerList()
-	for _, s := range servers {
-		if s.ID == serverID {
-			return &ServerDetails{
-				ServerInfo:    s,
-				Mods:          s.getMockMods(),
-				TotalSize:     1024 * 1024 * 1024, // 1 GB
-				InstalledSize: 512 * 1024 * 1024,  // 512 MB
-				MissingSize:   512 * 1024 * 1024,  // 512 MB
-			}, nil
+	reg, err := manifestv1.LoadRegistry(filepath.Join(s.workspaceRoot(), "examples", "servers.json"))
+	if err != nil {
+		return nil, err
+	}
+	desc, err := manifestv1.FindServer(reg, serverID)
+	if err != nil {
+		return nil, err
+	}
+	manifest, err := s.loadManifestForDescriptor(desc)
+	if err != nil {
+		return nil, err
+	}
+	mods := make([]ModInfo, len(manifest.Mods))
+	var total int64
+	for i, m := range manifest.Mods {
+		total += m.SizeBytes
+		mods[i] = ModInfo{
+			ID:         m.ID,
+			Name:       m.Name,
+			WorkshopID: m.WorkshopID,
+			Size:       m.SizeBytes,
+			Required:   !m.Optional,
 		}
 	}
-	return nil, fmt.Errorf("server not found: %s", serverID)
-}
-
-// getMockMods returns mock mod list
-func (s ServerInfo) getMockMods() []ModInfo {
-	return []ModInfo{
-		{
-			ID:         "mod-1",
-			Name:       "Brita Weapons",
-			WorkshopID: "2200148440",
-			Size:       100 * 1024 * 1024,
-			Installed:  s.Installed,
-			UpToDate:   s.UpToDate,
-			Required:   true,
+	return &ServerDetails{
+		ServerInfo: ServerInfo{
+			ID:          desc.ID,
+			Name:        desc.Name,
+			Description: desc.Description,
+			PlayerCount: desc.PlayerCount,
+			MaxPlayers:  desc.MaxPlayers,
+			Ping:        desc.Ping,
+			ModCount:    len(mods),
 		},
-		{
-			ID:         "mod-2",
-			Name:       "Common Sense",
-			WorkshopID: "2875848298",
-			Size:       50 * 1024 * 1024,
-			Installed:  s.Installed,
-			UpToDate:   s.UpToDate,
-			Required:   true,
-		},
-		{
-			ID:         "mod-3",
-			Name:       "True Music",
-			WorkshopID: "2529746725",
-			Size:       20 * 1024 * 1024,
-			Installed:  s.Installed,
-			UpToDate:   s.UpToDate,
-			Required:   false,
-		},
-	}
-}
-
-// GetSessionStatus returns mock status
-func (s *UIService) GetSessionStatus(sessionID string) (*SessionStatus, error) {
-	return &SessionStatus{
-		SessionID:     sessionID,
-		State:         "complete",
-		Progress:      100,
-		DownloadSpeed: 0,
-		ETA:           0,
+		Mods:      mods,
+		TotalSize: total,
 	}, nil
+}
+
+// GetSessionStatus returns tracked session progress
+func (s *UIService) GetSessionStatus(sessionID string) (*SessionStatus, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if st, ok := s.sessions[sessionID]; ok {
+		copy := *st
+		return &copy, nil
+	}
+	return &SessionStatus{SessionID: sessionID, State: "idle", Progress: 0}, nil
 }
 
 // RepairCache mocks cache repair
 func (s *UIService) RepairCache() error {
-	s.emitEvent(UIEvent{
-		Type:      EventCacheRepairStart,
-		Timestamp: time.Now().Unix(),
-	})
-
-	// Simulate repair
-	time.Sleep(2 * time.Second)
-
-	s.emitEvent(UIEvent{
-		Type:      EventCacheRepairComplete,
-		Timestamp: time.Now().Unix(),
-	})
-
+	s.emitEvent(UIEvent{Type: EventCacheRepairStart, Timestamp: time.Now().Unix()})
+	time.Sleep(500 * time.Millisecond)
+	s.emitEvent(UIEvent{Type: EventCacheRepairComplete, Timestamp: time.Now().Unix()})
 	return nil
 }
 
-// GetSettings returns default settings
+// GetSettings returns launcher settings (RFC-0036)
 func (s *UIService) GetSettings() (*Settings, error) {
-	return &Settings{
-		SteamCMDPath:     "/usr/bin/steamcmd",
-		CacheLocation:    "~/PZLauncher/cache",
-		ProfilesLocation: "~/PZLauncher/profiles",
-		MaxConcurrent:    3,
-		BandwidthLimit:   0,
-	}, nil
+	st, err := settings.Load(s.workspaceRoot())
+	if err != nil {
+		return nil, err
+	}
+	return sharedToUI(st), nil
 }
 
 // SaveSettings saves settings
-func (s *UIService) SaveSettings(settings Settings) error {
-	// TODO: Persist to config file
+func (s *UIService) SaveSettings(ui Settings) error {
+	st := uiToShared(ui)
+	root := s.workspaceRoot()
+	if err := settings.Save(root, st); err != nil {
+		return err
+	}
+	settings.ApplyGamePathEnv(st)
+	s.pipeline = pipeline.NewService(settings.ToPipelineConfig(root, st))
 	return nil
+}
+
+func sharedToUI(st *sharedtypes.LauncherSettings) *Settings {
+	return &Settings{
+		GamePath:         st.GamePath,
+		SteamCMDPath:     st.SteamCMDPath,
+		CacheLocation:    st.CachePath,
+		ProfilesLocation: st.ProfilesPath,
+		MaxConcurrent:    st.ConcurrentDownloads,
+		BandwidthLimit:   st.BandwidthLimitMbps,
+		VerifyChecksum:   st.VerifyChecksum,
+	}
+}
+
+func uiToShared(ui Settings) *sharedtypes.LauncherSettings {
+	return &sharedtypes.LauncherSettings{
+		GamePath:            ui.GamePath,
+		SteamCMDPath:        ui.SteamCMDPath,
+		CachePath:           ui.CacheLocation,
+		ProfilesPath:        ui.ProfilesLocation,
+		ConcurrentDownloads: ui.MaxConcurrent,
+		BandwidthLimitMbps:  ui.BandwidthLimit,
+		VerifyChecksum:      ui.VerifyChecksum,
+	}
 }
 
 // UI Event Types (RFC 0022)
 type UIEventType string
 
 const (
-	EventSessionStart         UIEventType = "session.start"
-	EventModResolveStart      UIEventType = "mod.resolve.start"
-	EventModResolveComplete   UIEventType = "mod.resolve.complete"
-	EventDownloadStart        UIEventType = "download.start"
-	EventDownloadProgress     UIEventType = "download.progress"
-	EventDownloadComplete     UIEventType = "download.complete"
-	EventInstallStart         UIEventType = "install.start"
-	EventInstallComplete      UIEventType = "install.complete"
-	EventSessionComplete      UIEventType = "session.complete"
-	EventError                UIEventType = "error"
-	EventCacheRepairStart     UIEventType = "cache.repair.start"
-	EventCacheRepairComplete  UIEventType = "cache.repair.complete"
+	EventSessionStart        UIEventType = "session.start"
+	EventModResolveStart     UIEventType = "mod.resolve.start"
+	EventModResolveComplete  UIEventType = "mod.resolve.complete"
+	EventDownloadStart       UIEventType = "download.start"
+	EventDownloadProgress    UIEventType = "download.progress"
+	EventDownloadComplete    UIEventType = "download.complete"
+	EventInstallStart        UIEventType = "install.start"
+	EventInstallComplete     UIEventType = "install.complete"
+	EventSessionComplete     UIEventType = "session.complete"
+	EventError               UIEventType = "error"
+	EventTraceUpdated        UIEventType = "trace.updated"
+	EventCacheRepairStart    UIEventType = "cache.repair.start"
+	EventCacheRepairComplete UIEventType = "cache.repair.complete"
 )
 
 // UIEvent matches RFC 0022
 type UIEvent struct {
-	Type      UIEventType          `json:"type"`
-	Timestamp int64                `json:"timestamp"`
-	SessionID string               `json:"sessionId"`
-	PackageID string               `json:"packageId,omitempty"`
-	Progress  *Progress            `json:"progress,omitempty"`
-	Error     string               `json:"error,omitempty"`
+	Type      UIEventType            `json:"type"`
+	Timestamp int64                  `json:"timestamp"`
+	SessionID string                 `json:"sessionId"`
+	PackageID string                 `json:"packageId,omitempty"`
+	Progress  *Progress              `json:"progress,omitempty"`
+	Error     string                 `json:"error,omitempty"`
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pzlauncher.local/schemas/launcher-events.schema.json",
+  "title": "LauncherEvent",
+  "description": "RFC-0022 / pipeline bridge — shared event contract",
+  "type": "object",
+  "required": ["type", "timestamp", "sessionId"],
+  "additionalProperties": false,
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "session.start",
+        "session.complete",
+        "mod.resolve.start",
+        "mod.resolve.complete",
+        "download.start",
+        "download.progress",
+        "download.complete",
+        "install.start",
+        "install.complete",
+        "manifest.loaded",
+        "manifest.failed",
+        "launch.started",
+        "launch.exited",
+        "launch.failed",
+        "error",
+        "trace.updated",
+        "cache.repair.start",
+        "cache.repair.complete"
+      ]
+    },
+    "timestamp": { "type": "integer" },
+    "sessionId": { "type": "string" },
+    "packageId": { "type": "string" },
+    "error": { "type": "string" },
+    "progress": { "$ref": "#/$defs/Progress" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "$defs": {
+    "Progress": {
+      "type": "object",
+      "required": ["current", "total", "percent"],
+      "properties": {
+        "current": { "type": "integer" },
+        "total": { "type": "integer" },
+        "percent": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "speed": { "type": "integer" },
+        "eta": { "type": "integer" }
+      }
+    }
+  }
+}

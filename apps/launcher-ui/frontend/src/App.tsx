@@ -7,6 +7,7 @@ import { TraceViewer } from './components/TraceViewer';
 import { useLauncherEvents } from './hooks/useRealEvents';
 import { useDownloadsStore } from './stores/downloads.store';
 import { useServersStore } from './stores/servers.store';
+import { useSessionStore } from './stores/session.store';
 import { launcherApi } from './wails';
 import { ServerInfo } from './types';
 import { Home, Download, Settings, Activity } from 'lucide-react';
@@ -22,15 +23,31 @@ function App() {
   // Phase 2.2: Read state from stores
   const { selectedServer, selectServer } = useServersStore();
   const { getActiveDownloads } = useDownloadsStore();
+  const launchState = useSessionStore((s) => s.launchState);
+  const currentServer = useSessionStore((s) => s.currentServer);
 
   const handleJoinServer = async (server: ServerInfo) => {
     try {
+      useSessionStore.getState().setCurrentServer(server);
       await launcherApi.joinServer(server.id);
       setCurrentView('downloads');
     } catch (err) {
       console.error('Failed to join server:', err);
     }
   };
+
+  const handleLaunchServer = async (server: ServerInfo) => {
+    try {
+      await launcherApi.launchServer(server.id);
+    } catch (err) {
+      console.error('Failed to launch game:', err);
+    }
+  };
+
+  const canLaunch =
+    launchState === 'complete' &&
+    currentServer != null &&
+    selectedServer?.id === currentServer.id;
 
   const hasActiveDownloads = getActiveDownloads().length > 0;
 
@@ -116,6 +133,7 @@ function App() {
           server={selectedServer}
           onClose={() => selectServer(null)}
           onJoin={() => handleJoinServer(selectedServer)}
+          onLaunch={canLaunch ? () => handleLaunchServer(selectedServer) : undefined}
         />
       )}
     </div>

@@ -1,10 +1,12 @@
 # IMPLEMENTATION_SUMMARY.md
 ## Complete Architecture Decision Framework (June 4, 2026)
 
-**Status**: ✅ Complete and ready for execution  
+> **Superseded for execution** by [PRODUCT_DECISION.md](PRODUCT_DECISION.md) and [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md).  
+> Path **A (Product)** chosen. Next: [docs/rfc/0030-server-manifest-v1.md](docs/rfc/0030-server-manifest-v1.md).
+
+**Status**: Historical — decision framework archive  
 **Build Status**: ✅ Passes (197.64 KB gzipped, 798ms build time)  
-**TypeScript**: ✅ Strict mode passing  
-**Next Action**: Read documents and make strategic decision
+**Next Action**: Implement domain RFCs 0030–0035
 
 ---
 

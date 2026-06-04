@@ -1,0 +1,57 @@
+{
+  "id": "demo-survival-1c2d4f251da9ee45",
+  "serverId": "demo-survival",
+  "profileId": "/Users/jamshidian/Developer/game-server/pz luncher/profiles/demo-survival",
+  "createdAt": "2026-06-04T21:21:22.502537+03:30",
+  "updatedAt": "2026-06-04T21:21:22.502725+03:30",
+  "inputHash": "1c2d4f251da9ee45107700a99f6761a20d87d6afce1ff887c6946a9227ae4129",
+  "executions": [
+    {
+      "packageId": "mod-a",
+      "providerDecision": {
+        "packageId": "mod-a",
+        "packageVersion": "1.0.0",
+        "packageSha256": "4fbc716b086d0746df8f5c7c04064ef6b0ef30ec8c2b9ea6ff9d7c8222fcb0fd",
+        "chosenProvider": "LocalCache",
+        "cached": true,
+        "decisionAt": "2026-06-04T21:21:22.502186+03:30",
+        "totalDurationMs": 0,
+        "finalReason": "found in LocalCache",
+        "attempts": [
+          {
+            "providerName": "LocalCache",
+            "checkedAt": "2026-06-04T21:21:22.502187+03:30",
+            "exists": true,
+            "durationMs": 0,
+            "cachePath": "/Users/jamshidian/Developer/game-server/pz luncher/cache/sha256/4fbc716b086d0746df8f5c7c04064ef6b0ef30ec8c2b9ea6ff9d7c8222fcb0fd"
+          },
+          {
+            "providerName": "Steam",
+            "checkedAt": "2026-06-04T21:21:22.502196+03:30",
+            "exists": false,
+            "durationMs": 0
+          }
+        ],
+        "fallbackChain": [
+          "LocalCache",
+          "Steam"
+        ]
+      },
+      "state": "skipped",
+      "startedAt": "0001-01-01T00:00:00Z",
+      "completedAt": "2026-06-04T21:21:22.502537+03:30",
+      "durationMs": 0,
+      "attempts": 0
+    }
+  ],
+  "summary": {
+    "totalPackages": 1,
+    "skippedCount": 1,
+    "downloadCount": 0,
+    "completedCount": 1,
+    "failedCount": 0,
+    "totalDurationMs": 0
+  },
+  "isComplete": true,
+  "isResumable": false
+}

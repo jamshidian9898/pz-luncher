@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pzlauncher.local/schemas/settings.schema.json",
+  "title": "LauncherSettings",
+  "description": "RFC-0036 — persisted launcher configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "gamePath": { "type": "string", "description": "Project Zomboid install (PZ_PATH)" },
+    "steamcmdPath": { "type": "string" },
+    "cachePath": { "type": "string" },
+    "profilesPath": { "type": "string" },
+    "concurrentDownloads": { "type": "integer", "minimum": 1, "maximum": 10, "default": 3 },
+    "bandwidthLimitMbps": { "type": "integer", "minimum": 0, "default": 0 },
+    "verifyChecksum": { "type": "boolean", "default": true }
+  }
+}

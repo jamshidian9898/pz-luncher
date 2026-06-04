@@ -1,7 +1,21 @@
 # README_START_HERE.md
 ## 🎯 The Absolute Beginning
 
+> **⚠️ Updated 2026-06-04** — Product path chosen.  
+> **Start here instead**: [PRODUCT_DECISION.md](PRODUCT_DECISION.md) → [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md) → [docs/rfc/0030-server-manifest-v1.md](docs/rfc/0030-server-manifest-v1.md)  
+> The sections below are the **historical** Path A/B/C decision guide.
+
+---
+
 **If you're new to this project and don't know where to start:**
+
+Read [PRODUCT_DECISION.md](PRODUCT_DECISION.md) (2 minutes), then [docs/DOMAIN_RFC_INDEX.md](docs/DOMAIN_RFC_INDEX.md).
+
+---
+
+## ~~Legacy navigation~~ (decision already made: Product / Path A)
+
+**If you're reviewing old decision docs:**
 
 Read this page (2 minutes), then follow the path that matches your situation.
 

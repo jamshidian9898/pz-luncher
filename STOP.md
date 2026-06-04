@@ -1,5 +1,8 @@
 # STOP — Platform v1.0 (Calibration Phase)
 
+> **Product team**: Primary work is [PRODUCT_DECISION.md](PRODUCT_DECISION.md) / RFC 0030–0035.  
+> This file applies to **Go platform validation** (optional parallel track).
+
 **Date**: 2026-06-04  
 **Status**: � **CALIBRATING — Core Frozen, Validation Layer Tuning**  
 

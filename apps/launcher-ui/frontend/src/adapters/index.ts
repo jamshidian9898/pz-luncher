@@ -1,15 +1,16 @@
 import { WailsLauncherApi } from './WailsLauncherApi';
-import { MockLauncherApi } from './MockLauncherApi';
+import { RegistryLauncherApi } from './RegistryLauncherApi';
 import { WailsEventsApi } from './WailsEventsApi';
-import { MockEventsApi } from './MockEventsApi';
+import { RegistryEventsApi } from './RegistryEventsApi';
 import { WailsSettingsApi } from './WailsSettingsApi';
-import { MockSettingsApi } from './MockSettingsApi';
+import { RegistrySettingsApi } from './RegistrySettingsApi';
 
+/** Wails desktop bindings, or registry + dev-api (default for Vite dev). */
 export const createLauncherApi = (isWails: boolean) =>
-  isWails ? new WailsLauncherApi() : new MockLauncherApi();
+  isWails ? new WailsLauncherApi() : new RegistryLauncherApi();
 
 export const createEventsApi = (isWails: boolean) =>
-  isWails ? new WailsEventsApi() : new MockEventsApi();
+  isWails ? new WailsEventsApi() : new RegistryEventsApi();
 
 export const createSettingsApi = (isWails: boolean) =>
-  isWails ? new WailsSettingsApi() : new MockSettingsApi();
+  isWails ? new WailsSettingsApi() : new RegistrySettingsApi();

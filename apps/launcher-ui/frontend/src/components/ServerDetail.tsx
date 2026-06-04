@@ -5,9 +5,10 @@ interface ServerDetailProps {
   server: ServerInfo;
   onClose: () => void;
   onJoin: () => void;
+  onLaunch?: () => void;
 }
 
-export function ServerDetail({ server, onClose, onJoin }: ServerDetailProps) {
+export function ServerDetail({ server, onClose, onJoin, onLaunch }: ServerDetailProps) {
   const canPlay = server.installed && server.upToDate;
   const needsUpdate = server.installed && !server.upToDate;
 
@@ -52,33 +53,43 @@ export function ServerDetail({ server, onClose, onJoin }: ServerDetailProps) {
           >
             Cancel
           </button>
-          <button
-            onClick={onJoin}
-            className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors ${
-              canPlay
-                ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                : needsUpdate
-                ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                : 'bg-blue-600 hover:bg-blue-500 text-white'
-            }`}
-          >
-            {canPlay ? (
-              <>
-                <Play size={18} />
-                Play
-              </>
-            ) : needsUpdate ? (
-              <>
-                <Download size={18} />
-                Update
-              </>
-            ) : (
-              <>
-                <Download size={18} />
-                Install
-              </>
-            )}
-          </button>
+          {onLaunch ? (
+            <button
+              onClick={onLaunch}
+              className="flex items-center gap-2 px-6 py-2 rounded-lg font-medium bg-emerald-600 hover:bg-emerald-500 text-white"
+            >
+              <Play size={18} />
+              Launch Game
+            </button>
+          ) : (
+            <button
+              onClick={onJoin}
+              className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors ${
+                canPlay
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  : needsUpdate
+                  ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                  : 'bg-blue-600 hover:bg-blue-500 text-white'
+              }`}
+            >
+              {canPlay ? (
+                <>
+                  <Play size={18} />
+                  Play
+                </>
+              ) : needsUpdate ? (
+                <>
+                  <Download size={18} />
+                  Update
+                </>
+              ) : (
+                <>
+                  <Download size={18} />
+                  Install & Join
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>

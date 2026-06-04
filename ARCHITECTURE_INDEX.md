@@ -1,9 +1,12 @@
 # ARCHITECTURE_INDEX.md
 ## Navigation Guide for Architectural Decision & Execution
 
+> **✅ Product path active** — use [PRODUCT_DECISION.md](PRODUCT_DECISION.md) and [docs/DOMAIN_RFC_INDEX.md](docs/DOMAIN_RFC_INDEX.md) first.  
+> This index covers the **legacy** Path A/B/C and Hybrid enforcement docs.
+
 **Purpose**: Help you find the right document for your current stage  
-**Use this when**: You need to understand the architecture or make decisions  
-**Your starting point**: This document (you're here!)
+**Use this when**: Reviewing historical strategy or Hybrid enforcement (not required for Path A)  
+**Your starting point**: [PRODUCT_DECISION.md](PRODUCT_DECISION.md)
 
 ---
 

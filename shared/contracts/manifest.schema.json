@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pzlauncher.local/schemas/manifest.schema.json",
+  "title": "ServerManifest",
+  "description": "RFC-0030 — single source of truth for Go and TypeScript",
+  "type": "object",
+  "required": ["serverId", "version", "gameVersion", "mods", "profile"],
+  "additionalProperties": false,
+  "properties": {
+    "serverId": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "minLength": 1 },
+    "gameVersion": { "type": "string", "minLength": 1 },
+    "launchArgs": { "type": "array", "items": { "type": "string" } },
+    "mods": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ModEntry" }
+    },
+    "profile": { "$ref": "#/$defs/ProfileConfig" }
+  },
+  "$defs": {
+    "ModEntry": {
+      "type": "object",
+      "required": ["id", "name", "version", "sha256", "dependencies"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "sizeBytes": { "type": "integer", "minimum": 0 },
+        "workshopId": { "type": "string" },
+        "downloadUrl": { "type": "string" },
+        "dependencies": { "type": "array", "items": { "type": "string" } },
+        "optional": { "type": "boolean" }
+      }
+    },
+    "ProfileConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profileId": { "type": "string" },
+        "modLoadOrder": { "type": "array", "items": { "type": "string" } },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "ServerDescriptor": {
+      "type": "object",
+      "required": ["id", "name", "manifestPath"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "manifestPath": { "type": "string" },
+        "playerCount": { "type": "integer" },
+        "maxPlayers": { "type": "integer" },
+        "ping": { "type": "integer" }
+      }
+    },
+    "ServerRegistry": {
+      "type": "object",
+      "required": ["servers"],
+      "properties": {
+        "servers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ServerDescriptor" }
+        }
+      }
+    }
+  }
+}

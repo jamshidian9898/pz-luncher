@@ -69,6 +69,10 @@ export class MockLauncherApi implements LauncherApi {
     this.simulateMockSession(serverId);
   }
 
+  async launchServer(_serverId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
   async getSessionStatus(sessionId: string): Promise<SessionStatus> {
     return { sessionId, state: 'complete', progress: 100 };
   }

@@ -1,32 +1,25 @@
 # Project Zomboid Launcher
 
-> **🛑 CRITICAL DECISION POINT**  
-> **See**: `ARCHITECTURAL_DECISION.md` — System has evolved beyond launcher scope  
-> **Required**: Choose between Product Mode or Platform Mode before proceeding  
-> **Status**: Feature development blocked until decision is made
+> **Phase 1: Product Execution** — [PRODUCT_DECISION.md](PRODUCT_DECISION.md)  
+> Build a **player-ready launcher**. Domain RFCs **0030–0035**, not new infrastructure RFCs.  
+> Roadmap: [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md)
 
 ---
 
-## Current Architecture Status
+## Current focus
 
-This repository has evolved from a simple launcher into an **event-sourced runtime engine** with production-grade optimization:
+| Layer | Status |
+|-------|--------|
+| UI infrastructure (RFC-0024/0025) | ✅ Done — use, don't extend |
+| Go session / download core | ✅ Usable — wire to product flow |
+| Domain (manifest → launch) | 🟡 **Active** — RFC-0030 → 0035 |
+| Cloud microservices | ⏸️ After MVP |
 
-- ✅ **RFC-0024**: Event Log + Replay System (audit trail, deterministic reconstruction)
-- ✅ **RFC-0025**: Snapshot + Compaction Engine (10x reconstruction speedup, memory governance)
-- ✅ **RFCs 0001-0023**: Foundation systems (manifests, profiles, contracts, agents)
-
-**The Question**: Is this infrastructure a **product** (launcher) or a **platform** (extensible system)?
-
-See `ARCHITECTURAL_DECISION.md` for:
-- Two possible paths forward (Product vs Platform)
-- Trade-off analysis and decision framework
-- Implementation roadmaps for each path
-- Recommendation: Hybrid approach (launcher first, platform second)
+**Start here**: [docs/rfc/0030-server-manifest-v1.md](docs/rfc/0030-server-manifest-v1.md)
 
 ---
 
-This repository is a monorepo for a universal Project Zomboid launcher and mod ecosystem.  
-**Current status**: Architecture validation complete. Awaiting strategic direction.
+This repository is a monorepo for a universal Project Zomboid launcher and mod ecosystem.
 
 The goal is to support:
 - Server discovery and one-click join
@@ -39,4 +32,6 @@ Scaffolded structure includes:
 - `libs/` for shared manifest, package, profile, cache, downloader, and contract libraries
 - `docs/` for architecture, API contracts, and RFCs
 
-Use `.agent.md` as the scaffolding agent when you want to generate initial project files and architecture docs.
+- [docs/DOMAIN_RFC_INDEX.md](docs/DOMAIN_RFC_INDEX.md) — active specs  
+- [STATUS.md](STATUS.md) — Go platform status  
+- `.agent.md` — scaffolding agent (legacy; prefer domain RFCs for new work)

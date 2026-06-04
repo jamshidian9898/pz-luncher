@@ -1,0 +1,17 @@
+{
+  "serverId": "demo-survival",
+  "sessionId": "session-1780595922",
+  "stages": [
+    {
+      "at": "2026-06-04T21:28:42+03:30",
+      "modCount": 1,
+      "name": "ResolveMods",
+      "status": "ok"
+    },
+    {
+      "at": "2026-06-04T21:28:42+03:30",
+      "name": "Ready",
+      "status": "ok"
+    }
+  ]
+}

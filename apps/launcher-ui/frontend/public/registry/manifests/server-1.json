@@ -1,0 +1,19 @@
+{
+  "serverId": "server-1",
+  "version": "1",
+  "gameVersion": "42.8",
+  "mods": [
+    {
+      "id": "mod-a",
+      "name": "Mod A",
+      "version": "1.0",
+      "sha256": "4fbc716b086d0746df8f5c7c04064ef6b0ef30ec8c2b9ea6ff9d7c8222fcb0fd",
+      "workshopId": "2200148440",
+      "dependencies": []
+    },
+  ],
+  "launchArgs": [],
+  "profile": {
+    "profileId": "server-1"
+  }
+}

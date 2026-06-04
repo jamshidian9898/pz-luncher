@@ -1,10 +1,22 @@
 # Platform Status
 
 **Platform**: PZ Launcher Execution Kernel  
-**Status**: 🟢 **FROZEN v1.0**  
+**Status**: 🟢 **FROZEN v1.0** (Go core)  
+**Product**: 🟡 **Phase 1 Execution** — see [PRODUCT_DECISION.md](PRODUCT_DECISION.md)  
 **Last Updated**: 2026-06-04  
 
-## Quick Status
+## Product layer (active)
+
+| Item | Link |
+|------|------|
+| Decision | [PRODUCT_DECISION.md](PRODUCT_DECISION.md) |
+| 8-week plan | [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md) |
+| Domain RFCs | [docs/DOMAIN_RFC_INDEX.md](docs/DOMAIN_RFC_INDEX.md) |
+| Next spec | [docs/rfc/0030-server-manifest-v1.md](docs/rfc/0030-server-manifest-v1.md) |
+
+---
+
+## Quick Status (Go platform)
 
 | Component | Status | Notes |
 |-----------|--------|-------|

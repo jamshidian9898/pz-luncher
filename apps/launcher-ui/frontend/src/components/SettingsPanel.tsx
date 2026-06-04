@@ -35,6 +35,16 @@ export function SettingsPanel() {
     <div className="max-w-2xl space-y-6">
       {/* Paths */}
       <SettingSection title="Paths">
+        <SettingRow label="Game Install (PZ_PATH)">
+          <input
+            type="text"
+            value={settings.gamePath}
+            onChange={(e) => setSettings({ ...settings, gamePath: e.target.value })}
+            placeholder="/path/to/ProjectZomboid"
+            className="w-96 max-w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-emerald-500"
+          />
+        </SettingRow>
+
         <SettingRow label="SteamCMD Location">
           <div className="flex items-center gap-2">
             <input
@@ -110,6 +120,17 @@ export function SettingsPanel() {
             className="w-24 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-emerald-500"
           />
           <span className="text-xs text-slate-500 ml-2">0 = Unlimited</span>
+        </SettingRow>
+      </SettingSection>
+
+      <SettingSection title="Integrity">
+        <SettingRow label="Verify checksums after download">
+          <input
+            type="checkbox"
+            checked={settings.verifyChecksum}
+            onChange={(e) => setSettings({ ...settings, verifyChecksum: e.target.checked })}
+            className="w-4 h-4 accent-emerald-500"
+          />
         </SettingRow>
       </SettingSection>
 

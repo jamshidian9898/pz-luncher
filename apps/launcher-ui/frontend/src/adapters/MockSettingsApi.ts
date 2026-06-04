@@ -2,11 +2,13 @@ import { SettingsApi } from '../interfaces/SettingsApi';
 import { Settings } from '../types';
 
 const MOCK_SETTINGS: Settings = {
+  gamePath: '',
   steamcmdPath: '/usr/bin/steamcmd',
   cacheLocation: '~/PZLauncher/cache',
   profilesLocation: '~/PZLauncher/profiles',
   maxConcurrent: 3,
   bandwidthLimit: 0,
+  verifyChecksum: true,
 };
 
 export class MockSettingsApi implements SettingsApi {

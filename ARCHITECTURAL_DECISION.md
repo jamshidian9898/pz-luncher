@@ -1,8 +1,12 @@
 # ARCHITECTURAL DECISION: Product vs Platform
 
+> **✅ RESOLVED** — **Path A (Product)** locked in [PRODUCT_DECISION.md](PRODUCT_DECISION.md).  
+> Execute [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md) and domain RFCs 0030–0035.  
+> This document is kept for historical context only.
+
 **Date**: June 4, 2026  
-**Status**: Under Review (Decision Required)  
-**Priority**: Critical (Blocks Future Development)
+**Status**: ~~Under Review~~ **Superseded by PRODUCT_DECISION.md**  
+**Priority**: ~~Critical~~ Reference only
 
 ---
 

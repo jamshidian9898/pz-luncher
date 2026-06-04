@@ -14,6 +14,10 @@ export class WailsLauncherApi implements LauncherApi {
     return window.go.main.App.JoinServer(serverId);
   }
 
+  async launchServer(serverId: string): Promise<void> {
+    return window.go.main.App.LaunchServer(serverId);
+  }
+
   async getSessionStatus(sessionId: string): Promise<SessionStatus> {
     return window.go.main.App.GetSessionStatus(sessionId);
   }
