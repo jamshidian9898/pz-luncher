@@ -53,7 +53,7 @@ export interface SessionStatus {
 /** UI settings — maps to LauncherSettings via settingsToLauncher */
 export interface Settings {
   gamePath: string;
-  steamcmdPath: string;
+  backendUrl: string;
   cacheLocation: string;
   profilesLocation: string;
   maxConcurrent: number;

@@ -53,6 +53,9 @@ func Default(workspaceRoot string) *sharedtypes.LauncherSettings {
 }
 
 func applyDefaults(s *sharedtypes.LauncherSettings, root string) {
+	if s.BackendURL == "" {
+		s.BackendURL = "http://localhost:8080"
+	}
 	if s.CachePath == "" {
 		s.CachePath = filepath.Join(root, "cache")
 	}

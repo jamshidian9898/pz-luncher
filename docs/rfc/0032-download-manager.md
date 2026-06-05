@@ -1,6 +1,10 @@
 # RFC-0032: Download Manager
 
-**Status**: Active — Phase 1 Product  
+**Status**: Active — Phase 1 Product / Updated for v2.0.0 — see [RFC-0050](0050-v2-architecture-rebaseline.md)  
+
+> **v2.0.0 delta**: All download URLs come from the Backend `JoinResponse.downloadPlan`. The Launcher never constructs URLs. Steam/Workshop delegation (`libs/session/steam_executor.go`) is removed from the Launcher; SteamCMD is a Backend concern.  
+
+
 **Depends on**: [RFC-0031](0031-mod-dependency-resolver.md)  
 **Integrates with**: `libs/session` (existing executor), [RFC-0011](0011-download-session.md)  
 **Feeds**: RFC-0033
@@ -87,8 +91,8 @@ On failure: set `Failed`, emit event; user may retry join (idempotent session).
 ## Resume
 
 - Temp file: `cache/downloads/<sessionId>/<modId>.part`
-- On restart: if `.part` exists and size < total → HTTP Range or re-fetch policy per provider
-- Steam/workshop: delegate to `libs/session/steam_executor.go`
+- On restart: if `.part` exists and size < total → HTTP Range request against Backend-issued URL
+- Steam/workshop delegation removed in v2.0.0 — SteamCMD is a Backend concern
 
 ---
 

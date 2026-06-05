@@ -1,5 +1,7 @@
 # RFC 0005: Agent Lifecycle
 
+> **v1.x historical record.** For v2.0.0 see [RFC-0050](0050-v2-architecture-rebaseline.md). The key v2 delta: Agent reports exclusively to the Backend. Launcher never contacts the Agent; Agent addresses are Backend-internal.
+
 ## Problem
 
 A server-side agent is required to generate manifests, publish status, and interact with the launcher ecosystem without modifying Project Zomboid.
@@ -20,11 +22,13 @@ A server-side agent is required to generate manifests, publish status, and inter
 - Emit periodic heartbeats to the directory or status service
 - Optionally upload package metadata to the registry
 
-### Agent API
+### Agent API (Backend-facing only)
 
-- `POST /heartbeat` — reports server health and availability
-- `PUT /manifest` — submits the current manifest
-- `GET /config` (optional) — returns agent configuration or server settings
+> **v2.0.0**: These endpoints are consumed by the Backend, not the Launcher.
+
+- `POST /heartbeat` — reports server health and availability to Backend
+- `PUT /manifest` — submits the current manifest to Backend
+- `GET /config` (optional) — returns agent configuration or server settings (Backend use only)
 
 ### Operation
 

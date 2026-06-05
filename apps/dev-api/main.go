@@ -206,7 +206,7 @@ func main() {
 
 type uiSettings struct {
 	GamePath         string `json:"gamePath"`
-	SteamCMDPath     string `json:"steamcmdPath"`
+	BackendURL       string `json:"backendUrl"`
 	CacheLocation    string `json:"cacheLocation"`
 	ProfilesLocation string `json:"profilesLocation"`
 	MaxConcurrent    int    `json:"maxConcurrent"`
@@ -217,7 +217,7 @@ type uiSettings struct {
 func (u uiSettings) toShared() sharedtypes.LauncherSettings {
 	return sharedtypes.LauncherSettings{
 		GamePath:            u.GamePath,
-		SteamCMDPath:        u.SteamCMDPath,
+		BackendURL:          u.BackendURL,
 		CachePath:           u.CacheLocation,
 		ProfilesPath:        u.ProfilesLocation,
 		ConcurrentDownloads: u.MaxConcurrent,

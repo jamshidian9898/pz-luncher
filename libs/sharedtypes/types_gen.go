@@ -52,10 +52,10 @@ func (m *ServerManifest) ProfileID() string {
 	return m.ServerID
 }
 
-// LauncherSettings (RFC-0036)
+// LauncherSettings (RFC-0036 v2.0.0)
 type LauncherSettings struct {
 	GamePath              string `json:"gamePath,omitempty"`
-	SteamCMDPath          string `json:"steamcmdPath,omitempty"`
+	BackendURL            string `json:"backendUrl,omitempty"`
 	CachePath             string `json:"cachePath,omitempty"`
 	ProfilesPath          string `json:"profilesPath,omitempty"`
 	ConcurrentDownloads   int    `json:"concurrentDownloads,omitempty"`

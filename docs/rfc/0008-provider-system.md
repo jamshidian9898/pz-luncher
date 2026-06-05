@@ -1,5 +1,7 @@
 # RFC 0008: Provider System
 
+> **v1.x historical record.** For v2.0.0 see [RFC-0050](0050-v2-architecture-rebaseline.md). The key v2 delta: `SteamProvider` and `ServerProvider` are removed from the Launcher. The Launcher provider stack is `LocalCacheProvider` → `BackendProvider` only. Steam and server content is resolved by the Backend before URLs are issued to the Launcher.
+
 ## Problem
 
 Package resolution must be flexible enough to use multiple content sources and provider types.
@@ -37,12 +39,19 @@ type Provider interface {
 }
 ```
 
-## Provider implementations
+## Provider implementations (v1.x)
 
 - `LocalCacheProvider`
 - `RegistryProvider`
 - `ServerProvider`
 - `SteamProvider`
+
+## Provider implementations (v2.0.0)
+
+- `LocalCacheProvider` — already-downloaded content, SHA256-keyed
+- `BackendProvider` — URLs issued by Backend JoinResponse
+
+`ServerProvider` and `SteamProvider` are removed from the Launcher in v2.0.0. They exist in the Backend's internal resolution stack.
 
 ## Provider resolution
 

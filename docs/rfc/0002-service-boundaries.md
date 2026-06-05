@@ -1,5 +1,7 @@
 # RFC 0002: Service Boundaries
 
+> **v1.x historical record.** Superseded by [RFC-0050](0050-v2-architecture-rebaseline.md) for v2.0.0. The key v2 delta: Launcher→Agent coupling is removed; the Backend is the single control plane.
+
 ## Problem
 
 The Project Zomboid launcher ecosystem requires multiple cooperating services, but the boundaries between those services are not yet clearly defined.
@@ -45,10 +47,12 @@ The Project Zomboid launcher ecosystem requires multiple cooperating services, b
 
 ### Agent
 
+> **v2.0.0**: Agent is Backend-managed infrastructure. Launcher never contacts the Agent directly.
+
 - Runs beside a dedicated server
 - Detects mod changes and generates manifests
-- Reports server state, player counts, and status
-- Uploads manifest and optionally package metadata
+- Reports server state, player counts, and status to **Backend only**
+- Uploads manifest and package metadata to **Backend only**
 
 ## Non-Goals
 

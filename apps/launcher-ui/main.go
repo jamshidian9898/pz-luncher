@@ -135,10 +135,10 @@ type SessionStatus struct {
 	Errors        []string `json:"errors,omitempty"`
 }
 
-// Settings for the launcher (RFC-0036 — mirrors shared/contracts/settings.schema.json)
+// Settings for the launcher (RFC-0036 v2.0.0 — mirrors shared/contracts/settings.schema.json)
 type Settings struct {
 	GamePath         string `json:"gamePath"`
-	SteamCMDPath     string `json:"steamcmdPath"`
+	BackendURL       string `json:"backendUrl"`
 	CacheLocation    string `json:"cacheLocation"`
 	ProfilesLocation string `json:"profilesLocation"`
 	MaxConcurrent    int    `json:"maxConcurrent"`

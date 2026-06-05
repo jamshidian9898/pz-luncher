@@ -11,7 +11,7 @@ type Step = 'welcome' | 'gamepath' | 'cache' | 'done';
 
 const DEFAULT_SETTINGS: Settings = {
   gamePath: '',
-  steamcmdPath: '',
+  backendUrl: 'http://localhost:8080',
   cacheLocation: '',
   profilesLocation: '',
   maxConcurrent: 3,

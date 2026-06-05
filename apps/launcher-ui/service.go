@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"path/filepath"
+	"io"
+	"net/http"
 	"sync"
 	"time"
 
-	"pzlauncher/libs/manifestv1"
 	"pzlauncher/libs/pipeline"
 	"pzlauncher/libs/settings"
 	"pzlauncher/libs/sharedtypes"
@@ -23,9 +24,10 @@ type UIService struct {
 	workspaceRoot string
 	pipeline      *pipeline.Service
 
-	lastJoin   *pipeline.JoinResult
-	lastServer string
-	sessions   map[string]*SessionStatus
+	lastJoin         *pipeline.JoinResult
+	lastServer       string
+	lastJoinResponse *pipeline.BackendJoinResponse
+	sessions         map[string]*SessionStatus
 }
 
 // NewUIService creates UI service
@@ -155,12 +157,21 @@ func (s *UIService) updateSessionFromEvent(ev UIEvent) {
 	}
 }
 
-// JoinServer runs the real join pipeline (RFC-0033).
+// JoinServer calls Backend POST /api/v1/join and runs the v2 download pipeline.
 func (s *UIService) JoinServer(serverID string) error {
 	go func() {
 		ctx := context.Background()
 		emit := s.pipelineEmit()
-		result, err := s.pipeline.RunJoin(ctx, serverID, emit)
+
+		// Call Backend join API (A3)
+		var jr pipeline.BackendJoinResponse
+		url := fmt.Sprintf("%s/api/v1/join/%s", s.backendURL(), serverID)
+		if err := s.backendPost(url, &jr); err != nil {
+			emit(pipeline.Event{Type: "error", Error: fmt.Sprintf("BACKEND_JOIN: %v", err)})
+			return
+		}
+
+		result, err := s.pipeline.RunJoinFromBackend(ctx, jr, emit)
 		s.mu.Lock()
 		if err != nil {
 			s.mu.Unlock()
@@ -168,6 +179,7 @@ func (s *UIService) JoinServer(serverID string) error {
 		}
 		s.lastJoin = result
 		s.lastServer = serverID
+		s.lastJoinResponse = &jr
 		s.mu.Unlock()
 	}()
 	return nil
@@ -177,94 +189,131 @@ func (s *UIService) JoinServer(serverID string) error {
 func (s *UIService) LaunchServer(serverID string) error {
 	s.mu.Lock()
 	join := s.lastJoin
+	jr := s.lastJoinResponse
 	s.mu.Unlock()
 	if join == nil || !join.Ready {
 		return fmt.Errorf("LAUNCH_PROFILE_NOT_READY: join server first")
 	}
-	if join.Manifest.ServerID != serverID && serverID != "" {
+	// v2 path: we have a BackendJoinResponse with launch args
+	if jr != nil {
+		if jr.Manifest.ServerID != serverID && serverID != "" {
+			return fmt.Errorf("LAUNCH_PROFILE_NOT_READY: no join session for server %s", serverID)
+		}
+		go func() {
+			_ = s.pipeline.LaunchFromBackend(context.Background(), jr.Manifest.ServerID, join.ProfilePath, *jr, s.pipelineEmit())
+		}()
+		return nil
+	}
+	// v1 fallback: manifest embedded in JoinResult
+	if join.Manifest != nil && join.Manifest.ServerID != serverID && serverID != "" {
 		return fmt.Errorf("LAUNCH_PROFILE_NOT_READY: no join session for server %s", serverID)
 	}
 	go func() {
-		_ = s.pipeline.Launch(context.Background(), join.Manifest.ServerID, join.ProfilePath, s.pipelineEmit())
+		_ = s.pipeline.Launch(context.Background(), serverID, join.ProfilePath, s.pipelineEmit())
 	}()
 	return nil
 }
 
-// GetServerList loads servers from examples/servers.json
+// GetServerList fetches the server list from the Backend registry API (A2).
 func (s *UIService) GetServerList() []ServerInfo {
-	reg, err := manifestv1.LoadRegistry(filepath.Join(s.getWorkspaceRoot(), "examples", "servers.json"))
-	if err != nil {
-		return fallbackServerList()
+	type backendServer struct {
+		ID          string   `json:"id"`
+		Name        string   `json:"name"`
+		Description string   `json:"description"`
+		PlayerCount int      `json:"playerCount"`
+		MaxPlayers  int      `json:"maxPlayers"`
+		Status      string   `json:"status"`
+		Tags        []string `json:"tags"`
 	}
-	out := make([]ServerInfo, 0, len(reg.Servers))
-	for _, d := range reg.Servers {
-		modCount := 0
-		if m, err := s.loadManifestForDescriptor(&d); err == nil {
-			modCount = len(m.Mods)
-		}
+	type response struct {
+		Servers []backendServer `json:"servers"`
+	}
+
+	baseURL := s.backendURL()
+	var resp response
+	if err := s.backendGet(baseURL+"/api/v1/servers", &resp); err != nil {
+		return s.fallbackServerList()
+	}
+	out := make([]ServerInfo, 0, len(resp.Servers))
+	for _, d := range resp.Servers {
 		out = append(out, ServerInfo{
 			ID:          d.ID,
 			Name:        d.Name,
 			Description: d.Description,
 			PlayerCount: d.PlayerCount,
 			MaxPlayers:  d.MaxPlayers,
-			Ping:        d.Ping,
-			ModCount:    modCount,
 		})
 	}
 	return out
 }
 
-func fallbackServerList() []ServerInfo {
-	return []ServerInfo{{
-		ID: "demo-survival", Name: "Demo Survival", Description: "Offline demo",
-		PlayerCount: 0, MaxPlayers: 32, Ping: 0, ModCount: 1,
-	}}
-}
-
-func (s *UIService) loadManifestForDescriptor(d *manifestv1.ServerDescriptor) (*manifestv1.ServerManifest, error) {
-	return manifestv1.LoadFile(filepath.Join(s.getWorkspaceRoot(), d.ManifestPath))
-}
-
-// GetServerDetails returns manifest-driven mod list
+// GetServerDetails fetches server details via the Backend join API (A2).
+// For Phase A2 we use GET /api/v1/servers/{id}; mod details added in A3.
 func (s *UIService) GetServerDetails(serverID string) (*ServerDetails, error) {
-	reg, err := manifestv1.LoadRegistry(filepath.Join(s.getWorkspaceRoot(), "examples", "servers.json"))
-	if err != nil {
-		return nil, err
+	type backendServer struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		PlayerCount int    `json:"playerCount"`
+		MaxPlayers  int    `json:"maxPlayers"`
 	}
-	desc, err := manifestv1.FindServer(reg, serverID)
-	if err != nil {
-		return nil, err
-	}
-	manifest, err := s.loadManifestForDescriptor(desc)
-	if err != nil {
-		return nil, err
-	}
-	mods := make([]ModInfo, len(manifest.Mods))
-	var total int64
-	for i, m := range manifest.Mods {
-		total += m.SizeBytes
-		mods[i] = ModInfo{
-			ID:         m.ID,
-			Name:       m.Name,
-			WorkshopID: m.WorkshopID,
-			Size:       m.SizeBytes,
-			Required:   !m.Optional,
-		}
+
+	baseURL := s.backendURL()
+	var srv backendServer
+	if err := s.backendGet(fmt.Sprintf("%s/api/v1/servers/%s", baseURL, serverID), &srv); err != nil {
+		return nil, fmt.Errorf("server not found: %w", err)
 	}
 	return &ServerDetails{
 		ServerInfo: ServerInfo{
-			ID:          desc.ID,
-			Name:        desc.Name,
-			Description: desc.Description,
-			PlayerCount: desc.PlayerCount,
-			MaxPlayers:  desc.MaxPlayers,
-			Ping:        desc.Ping,
-			ModCount:    len(mods),
+			ID:          srv.ID,
+			Name:        srv.Name,
+			Description: srv.Description,
+			PlayerCount: srv.PlayerCount,
+			MaxPlayers:  srv.MaxPlayers,
 		},
-		Mods:      mods,
-		TotalSize: total,
 	}, nil
+}
+
+func (s *UIService) backendURL() string {
+	root := s.getWorkspaceRoot()
+	st, _ := settings.Load(root)
+	if st != nil && st.BackendURL != "" {
+		return st.BackendURL
+	}
+	return "http://localhost:8080"
+}
+
+func (s *UIService) backendGet(url string, out interface{}) error {
+	resp, err := http.Get(url) //nolint:noctx
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("backend %s: %s", resp.Status, body)
+	}
+	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+func (s *UIService) backendPost(url string, out interface{}) error {
+	resp, err := http.Post(url, "application/json", nil) //nolint:noctx
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("backend %s: %s", resp.Status, body)
+	}
+	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+func (s *UIService) fallbackServerList() []ServerInfo {
+	return []ServerInfo{{
+		ID: "demo-survival", Name: "Demo Survival", Description: "Backend unreachable — offline demo",
+		PlayerCount: 0, MaxPlayers: 32,
+	}}
 }
 
 // GetSessionStatus returns tracked session progress
@@ -310,7 +359,7 @@ func (s *UIService) SaveSettings(ui Settings) error {
 func sharedToUI(st *sharedtypes.LauncherSettings) *Settings {
 	return &Settings{
 		GamePath:         st.GamePath,
-		SteamCMDPath:     st.SteamCMDPath,
+		BackendURL:       st.BackendURL,
 		CacheLocation:    st.CachePath,
 		ProfilesLocation: st.ProfilesPath,
 		MaxConcurrent:    st.ConcurrentDownloads,
@@ -322,7 +371,7 @@ func sharedToUI(st *sharedtypes.LauncherSettings) *Settings {
 func uiToShared(ui Settings) *sharedtypes.LauncherSettings {
 	return &sharedtypes.LauncherSettings{
 		GamePath:            ui.GamePath,
-		SteamCMDPath:        ui.SteamCMDPath,
+		BackendURL:          ui.BackendURL,
 		CachePath:           ui.CacheLocation,
 		ProfilesPath:        ui.ProfilesLocation,
 		ConcurrentDownloads: ui.MaxConcurrent,

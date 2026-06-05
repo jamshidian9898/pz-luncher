@@ -1,33 +1,46 @@
 # Architecture
 
+**v2.0.0 canonical** — see [RFC-0050](rfc/0050-v2-architecture-rebaseline.md)
+
 The project is organized as a monorepo with separate apps and shared libraries.
 
-## Architecture layers
+## Architecture layers (v2.0.0)
 
 ```text
-Directory Service
-        ↓
-Manifest System
-        ↓
-Content Registry
-        ↓
-Launcher Client
-        ↓
-Profile Isolation
-        ↓
-Project Zomboid
+┌─────────────────────────────────────────┐
+│               BACKEND                   │
+│  (single control plane)                 │
+│  Registry · Auth · Manifests            │
+│  Join APIs · Download APIs              │
+│  Agent enrollment · Installation tokens │
+│  Content acquisition                    │
+│       ┌──────────┐  ┌──────────┐        │
+│       │  Agents  │  │ SteamCMD │        │
+│       │(managed) │  │(last res)│        │
+│       └──────────┘  └──────────┘        │
+└───────────────────┬─────────────────────┘
+                    │ Backend API (only)
+                    ↓
+┌─────────────────────────────────────────┐
+│               LAUNCHER                  │
+│  Discover · Fetch manifest              │
+│  Download (URLs from Backend)           │
+│  Verify · Install · Profile isolation   │
+│  Launch Project Zomboid                 │
+└─────────────────────────────────────────┘
 ```
+
+**Rule**: Launcher communicates exclusively with Backend APIs. Agents and SteamCMD are Backend-internal infrastructure and are invisible to the Launcher.
 
 ## Component overview
 
-- `apps/directory-service`: public server list, search, filtering, favorties, tags, and heartbeats
-- `apps/registry-service`: package storage and content addressable registry
-- `apps/manifest-service`: manifest history, versioning, and rollback
-- `apps/launcher-core`: launch orchestration, dependency resolution, and profile preparation
+### Backend (server-side)
+- `apps/backend`: single control plane — registry, auth, manifest versioning, join APIs, download APIs, agent enrollment, installation tokens, content acquisition
+- `apps/pz-agent`: server-side agent (Backend-managed) — discovers mods, builds manifests, exposes content, sends heartbeats to Backend
+
+### Launcher (client-side)
+- `apps/launcher-core`: join orchestration, dependency resolution, profile preparation, game launch
 - `apps/launcher-ui`: user-facing interface for server discovery and join flow
-- `apps/pz-agent`: server-side agent that detects mod changes, generates manifests, and reports status
-- `apps/download-service`: download manager with resume, parallelism, and integrity checks
-- `apps/websocket-gateway`: live updates and status streaming
 
 ## Shared libraries
 
@@ -35,11 +48,11 @@ Project Zomboid
 - `libs/package`: package metadata and content manifest utilities
 - `libs/profile`: profile isolation rules and layout helpers
 - `libs/hashing`: hashing utilities for content-addressable storage
-- `libs/storage`: S3/MinIO and local cache storage helpers
-- `libs/providers`: external provider interfaces and adapters
-- `libs/steam`: Steam Workshop or external provider integration helpers
-- `libs/cache`: shared cache policies and deduplication logic
-- `libs/downloader`: chunked downloads, resume, and delta update helpers
+- `libs/downloader`: chunked downloads, resume, and integrity helpers
 - `libs/telemetry`: metrics, logging, and monitoring support
 - `libs/logger`: structured logger wrappers
 - `libs/contracts`: API contracts and DTO definitions
+
+## v1.x history
+
+v1.x architecture (Launcher → Agent direct communication, Launcher-side SteamCMD, per-provider priority stack) is preserved in Foundation RFCs 0001–0036 as historical record.

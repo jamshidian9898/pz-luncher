@@ -1,6 +1,8 @@
 # RFC-0033: Installation Pipeline
 
-**Status**: Active — Phase 1 Product  
+**Status**: Active — Phase 1 Product / Updated for v2.0.0 — see [RFC-0050](0050-v2-architecture-rebaseline.md)  
+
+> **v2.0.0 delta**: Pipeline prepended with `JoinRequest` stage. Launcher calls `POST /join/{serverId}` on the Backend; Backend returns manifest + download plan. Subsequent stages are unchanged except downloads use Backend-issued URLs only.  
 **Depends on**: RFC-0030, RFC-0031, RFC-0032  
 **Aligns with**: [RFC-0020](0020-game-installation.md), [RFC-0015](0015-profile-build.md)
 
@@ -12,16 +14,18 @@ Join flow must be one **orchestrated pipeline**, not disconnected steps. Users s
 
 ---
 
-## Pipeline (canonical)
+## Pipeline (canonical, v2.0.0)
 
 ```text
-resolve manifest          (RFC-0030)
+join request              POST /join/{serverId} → Backend
         ↓
-resolve mod plan          (RFC-0031)
+manifest + download plan  (Backend JoinResponse)
         ↓
-create download plan      (RFC-0032)
+resolve mod plan          (RFC-0031, local)
         ↓
-download                  (RFC-0032 + session executor)
+cache check               (skip mods with matching sha256)
+        ↓
+download                  (Backend-issued URLs, RFC-0032)
         ↓
 verify                    (checksum per mod)
         ↓
@@ -38,7 +42,8 @@ ready to launch           (RFC-0035)
 
 | Stage | Input | Output | Failure codes |
 |-------|--------|--------|----------------|
-| `ResolveManifest` | serverId | `ServerManifest` | `PIPELINE_MANIFEST` |
+| `JoinRequest` | serverId | `JoinResponse` (manifest + download plan) | `PIPELINE_JOIN` |
+| `ResolveManifest` | JoinResponse | `ServerManifest` | `PIPELINE_MANIFEST` |
 | `ResolveMods` | manifest | `ResolvedModPlan` | `PIPELINE_RESOLVER` |
 | `PlanDownloads` | plan | `DownloadQueue` | `PIPELINE_PLAN` |
 | `Download` | queue | completed queue | `PIPELINE_DOWNLOAD` |

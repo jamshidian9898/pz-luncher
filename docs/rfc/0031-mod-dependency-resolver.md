@@ -1,6 +1,10 @@
 # RFC-0031: Mod Dependency Resolver
 
-**Status**: Active — Phase 1 Product  
+**Status**: Active — Phase 1 Product / v2.0.0 compatible  
+
+> **v2.0.0 note**: Resolver logic is unchanged. The input `ServerManifest` now originates from the Backend `JoinResponse` rather than a local file or direct URL fetch. The `workshopId` field on `ResolvedMod` is informational only; `downloadUrl` is not used by the resolver — download URLs come from the Backend download plan.  
+
+
 **Depends on**: [RFC-0030](0030-server-manifest-v1.md)  
 **Extends**: [RFC-0013](0013-manifest-resolution.md), [RFC-0019](0019-package-resolution.md)  
 **Feeds**: RFC-0032, RFC-0033
@@ -98,7 +102,7 @@ export interface ResolverWarning {
 | `RESOLVER_CYCLE` | Circular dependency |
 | `RESOLVER_VERSION_CONFLICT` | Installed version ≠ required |
 | `RESOLVER_EMPTY_MANIFEST` | No mods to install |
-| `RESOLVER_MISSING_SOURCE` | No workshopId or downloadUrl |
+| `RESOLVER_MISSING_SOURCE` | No source reference (v1.x only; v2.0.0: Backend issues all URLs) |
 
 ---
 

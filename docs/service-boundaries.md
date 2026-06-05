@@ -1,36 +1,36 @@
 # Service Boundaries
 
-This project uses a microservice-style monorepo layout where each service owns a focused responsibility.
+**v2.0.0 canonical** — see [RFC-0050](rfc/0050-v2-architecture-rebaseline.md)
 
-## Directory Service
+The Backend is the **single control plane**. The Launcher communicates exclusively with the Backend API. Agents and SteamCMD are Backend-internal infrastructure invisible to the Launcher.
 
-- Publishes server metadata only
-- Supports search, filtering, region, tags, favorites
-- Exposes heartbeat and server status
-- Does not store mod content
+## Backend
 
-## Manifest Service
+- Single control plane for all server-side operations
+- Owns: registry, authentication, manifest versioning, join APIs, download APIs, agent enrollment, one-time installation tokens, content acquisition
+- Issues all download URLs to the Launcher
+- Manages Agent trust and enrollment
+- Invokes SteamCMD as a last resort (client cache miss → Backend storage miss → Agent unavailable)
 
-- Stores server manifests and manifest history
-- Tracks required mods, checksums, dependencies, and download locations
-- Exposes retrieval and rollback APIs
+## Agent (Backend-managed infrastructure)
 
-## Registry Service
+- Runs beside a dedicated Project Zomboid server
+- Reports exclusively to the Backend (heartbeats, manifests, metadata)
+- Discovers mods from server filesystem and builds manifests
+- Exposes content to Backend on request
+- Is never contacted by the Launcher
+- Agent addresses are Backend-internal
 
-- Stores packages in content-addressable storage by hash
-- Serves package metadata and download endpoints
-- Supports deduplication and shared cache semantics
+## SteamCMD (Backend-exclusive tool)
 
-## Launcher Core
+- Used only by the Backend, never by the Launcher
+- Invoked as last resort when: client cache misses, Backend storage misses, Agent content unavailable
+- Workshop IDs in manifest data are informational provenance only
 
-- Orchestrates join flow and dependency resolution
-- Checks cache and downloads missing content
-- Prepares isolated profile directories
-- Launches Project Zomboid with the correct mod environment
+## Launcher
 
-## Agent
-
-- Runs next to a dedicated server
-- Detects mod changes and generates manifests
-- Reports server status, player counts, and optionally uploads content
-- Uses server-local access to file and mod configuration state
+- Communicates exclusively with the Backend API
+- Responsibilities: server discovery, manifest fetch, mod plan resolution (local), download (URLs from Backend), SHA256 verify, profile installation, game launch
+- Never contacts Agents directly
+- Never executes SteamCMD
+- Never constructs content URLs independently

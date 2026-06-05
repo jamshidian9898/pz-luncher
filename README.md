@@ -1,5 +1,8 @@
 # Project Zomboid Launcher
 
+> **v2.0.0 Architecture** — [RFC-0050](docs/rfc/0050-v2-architecture-rebaseline.md) is the canonical spec.  
+> Launcher communicates exclusively with the Backend. Agents and SteamCMD are Backend-internal infrastructure.
+
 > **Phase 1: Product Execution** — [PRODUCT_DECISION.md](PRODUCT_DECISION.md)  
 > Build a **player-ready launcher**. Domain RFCs **0030–0035**, not new infrastructure RFCs.  
 > Roadmap: [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md)

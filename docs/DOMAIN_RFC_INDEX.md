@@ -1,9 +1,47 @@
-# Domain RFC Index — Phase 1 Product
+# Domain RFC Index — Phase 1 Product / v2.0.0
 
 **Active execution**. Infrastructure RFCs (0022–0025) are **complete** — do not extend without a product bug.
 
 **Decision**: [PRODUCT_DECISION.md](../PRODUCT_DECISION.md)  
 **Roadmap**: [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
+
+---
+
+## v2.0.0 Canonical Architecture
+
+| RFC | Title | Status |
+|-----|-------|--------|
+| [0050](rfc/0050-v2-architecture-rebaseline.md) | v2.0.0 Architecture Rebaseline | **Canonical — read first** |
+| [0051](rfc/0051-v2-phase-plan.md) | v2.0.0 Phase Plan (A/B/C) | **Active** |
+
+**Rule**: Launcher communicates exclusively with the Backend. Agents and SteamCMD are Backend-internal infrastructure invisible to the Launcher.
+
+---
+
+## Phase A — Backend Core
+
+| RFC | Title | Status |
+|-----|-------|--------|
+| [0052](rfc/0052-backend-core-api.md) | Backend Core API | **Active** |
+| [0053](rfc/0053-agent-enrollment.md) | Agent Enrollment | **Active** |
+| [0054](rfc/0054-backend-content-store.md) | Backend Content Store | **Active** |
+| [0055](rfc/0055-join-response-contract.md) | JoinResponse Contract | **Active — primary contract** |
+
+## Phase B — Agent
+
+| RFC | Title | Status |
+|-----|-------|--------|
+| [0056](rfc/0056-agent-minimal.md) | Agent Minimal | **Active** |
+
+## Launcher Surface Freeze
+
+The Launcher API surface is frozen at:
+
+```text
+GetServers() · Join() · Download() · Launch() · Settings() · Diagnostics()
+```
+
+No new Launcher features during Phase A and B. The product from here is **Backend + Agent**. The Launcher is the first client of the Platform.
 
 ---
 

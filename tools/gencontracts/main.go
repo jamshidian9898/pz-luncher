@@ -185,10 +185,10 @@ func (m *ServerManifest) ProfileID() string {
 	return m.ServerID
 }
 
-// LauncherSettings (RFC-0036)
+// LauncherSettings (RFC-0036 v2.0.0)
 type LauncherSettings struct {
 	GamePath              string ` + "`json:\"gamePath,omitempty\"`" + `
-	SteamCMDPath          string ` + "`json:\"steamcmdPath,omitempty\"`" + `
+	BackendURL            string ` + "`json:\"backendUrl,omitempty\"`" + `
 	CachePath             string ` + "`json:\"cachePath,omitempty\"`" + `
 	ProfilesPath          string ` + "`json:\"profilesPath,omitempty\"`" + `
 	ConcurrentDownloads   int    ` + "`json:\"concurrentDownloads,omitempty\"`" + `
@@ -264,7 +264,7 @@ export interface ServerRegistry {
 
 export interface LauncherSettings {
   gamePath?: string;
-  steamcmdPath?: string;
+  backendUrl?: string;
   cachePath?: string;
   profilesPath?: string;
   concurrentDownloads?: number;
@@ -313,7 +313,7 @@ export interface LauncherEvent {
 /** UI-facing settings (Wails binding shape) */
 export interface Settings {
   gamePath: string;
-  steamcmdPath: string;
+  backendUrl: string;
   cacheLocation: string;
   profilesLocation: string;
   maxConcurrent: number;
@@ -324,7 +324,7 @@ export interface Settings {
 export function settingsFromLauncher(s: LauncherSettings): Settings {
   return {
     gamePath: s.gamePath ?? '',
-    steamcmdPath: s.steamcmdPath ?? '',
+    backendUrl: s.backendUrl ?? 'http://localhost:8080',
     cacheLocation: s.cachePath ?? '',
     profilesLocation: s.profilesPath ?? '',
     maxConcurrent: s.concurrentDownloads ?? 3,
@@ -336,7 +336,7 @@ export function settingsFromLauncher(s: LauncherSettings): Settings {
 export function settingsToLauncher(s: Settings): LauncherSettings {
   return {
     gamePath: s.gamePath,
-    steamcmdPath: s.steamcmdPath,
+    backendUrl: s.backendUrl,
     cachePath: s.cacheLocation,
     profilesPath: s.profilesLocation,
     concurrentDownloads: s.maxConcurrent,

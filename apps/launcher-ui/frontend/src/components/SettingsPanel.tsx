@@ -72,20 +72,16 @@ export function SettingsPanel() {
           />
         </SettingRow>
 
-        <SettingRow label="SteamCMD Location">
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={settings.steamcmdPath}
-              onChange={(e) =>
-                setSettings({ ...settings, steamcmdPath: e.target.value })
-              }
-              className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-emerald-500"
-            />
-            <button className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors">
-              <Folder size={18} />
-            </button>
-          </div>
+        <SettingRow label="Backend URL">
+          <input
+            type="text"
+            value={settings.backendUrl}
+            onChange={(e) =>
+              setSettings({ ...settings, backendUrl: e.target.value })
+            }
+            placeholder="http://localhost:8080"
+            className="w-96 max-w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-emerald-500"
+          />
         </SettingRow>
 
         <SettingRow label="Cache Location">

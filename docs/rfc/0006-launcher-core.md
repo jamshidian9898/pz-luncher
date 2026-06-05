@@ -1,5 +1,7 @@
 # RFC 0006: Launcher Core
 
+> **v1.x historical record.** For v2.0.0 see [RFC-0050](0050-v2-architecture-rebaseline.md). The key v2 delta: Launcher communicates exclusively with the Backend API. It does not contact manifest-service, registry-service, or agents directly.
+
 ## Problem
 
 The launcher requires a central orchestration layer to convert a manifest into a runnable isolated profile and start Project Zomboid.
@@ -13,15 +15,17 @@ The launcher requires a central orchestration layer to convert a manifest into a
 
 ## Design
 
-### Join flow
+### Join flow (v2.0.0)
 
 1. User selects server in launcher UI
-2. Launcher fetches latest manifest from `manifest-service`
-3. Resolve mod dependencies and package hashes
-4. Check shared and profile caches for required content
-5. Download missing packages via `download-service`
-6. Build or sync the server-specific profile layout
-7. Launch Project Zomboid with the profile's mods and config
+2. Launcher calls `POST /join/{serverId}` on the **Backend**
+3. Backend returns a download plan (mod list with Backend-issued URLs and SHA256 hashes)
+4. Launcher resolves mod dependencies from the plan (local, deterministic)
+5. Check shared and profile caches for required content (by SHA256)
+6. Download missing packages from Backend-issued URLs
+7. Verify SHA256 of each downloaded blob
+8. Build or sync the server-specific profile layout
+9. Launch Project Zomboid with the profile's mods and config
 
 ### Profile preparation
 

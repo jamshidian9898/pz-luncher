@@ -1,6 +1,8 @@
 # RFC-0034: Profile System
 
-**Status**: Active — Phase 1 Product  
+**Status**: Active — Phase 1 Product / Updated for v2.0.0 — see [RFC-0050](0050-v2-architecture-rebaseline.md)  
+
+> **v2.0.0 delta**: `steamcmdPath` removed from Launcher settings. SteamCMD is a Backend concern.  
 **Depends on**: RFC-0033  
 **Extends**: [profile-system.md](../profile-system.md), [RFC-0007](0007-profile-isolation.md), [RFC-0017](0017-save-isolation.md)
 
@@ -90,7 +92,8 @@ From existing `Settings`:
 
 - `profilesLocation`
 - `cacheLocation`
-- `steamcmdPath` (for workshop downloads)
+
+`steamcmdPath` removed in v2.0.0 — SteamCMD is a Backend concern, not a Launcher setting.
 
 ---
 

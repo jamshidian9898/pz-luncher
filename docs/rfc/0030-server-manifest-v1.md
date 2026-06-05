@@ -1,6 +1,6 @@
 # RFC-0030: Server Manifest v1
 
-**Status**: Active — Phase 1 Product  
+**Status**: Active — Phase 1 Product (v1.x) / Updated for v2.0.0 — see [RFC-0050](0050-v2-architecture-rebaseline.md)  
 **Priority**: P0 (blocks all domain work)  
 **Supersedes**: Partially clarifies [RFC-0001](0001-manifest-format.md) for launcher v1  
 **Consumers**: RFC-0031, RFC-0032, RFC-0033, RFC-0034, RFC-0035
@@ -50,8 +50,9 @@ export interface ModEntry {
   sha256: string;            // expected content hash
   sizeBytes?: number;
 
-  workshopId?: string;       // Steam Workshop id if applicable
-  downloadUrl?: string;      // direct HTTP; optional if workshop-only
+  workshopId?: string;       // INFORMATIONAL ONLY (v2.0.0) — provenance record, not used by Launcher for download
+  // downloadUrl removed in v2.0.0 — download URLs are issued by Backend in JoinResponse, not embedded in manifest
+
   dependencies: string[];    // ids of required mods, in manifest only
 
   optional?: boolean;        // default false
@@ -146,10 +147,14 @@ Emit after validation (integrate with existing `LauncherEvent`):
 
 ---
 
-## Open questions (resolve in week 1)
+## v2.0.0 notes
 
-1. Manifest URL: per-server field in directory vs hardcoded demo?
-2. Semver vs integer for `version`?
-3. Require `workshopId` OR `downloadUrl` per mod?
+- `downloadUrl` is removed from `ModEntry`. Download URLs are issued by the Backend `POST /join/{serverId}` response (`JoinResponse.downloadPlan`).
+- `workshopId` is retained as **informational provenance only**. The Launcher MUST NOT use it to construct download URLs.
+- Manifest is fetched from the Backend; local file / URL fetch (v1.x) is superseded.
 
-**Default for MVP**: at least one of `workshopId` | `downloadUrl`; integer `version` ok.
+## Open questions (v1.x, resolved)
+
+1. Manifest URL: per-server field in directory vs hardcoded demo? — **v2: manifest from Backend join response**
+2. Semver vs integer for `version`? — integer ok
+3. Require `workshopId` OR `downloadUrl` per mod? — **v2: neither required for download; Backend issues URLs**

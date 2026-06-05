@@ -3,7 +3,7 @@ import { Settings } from '../types';
 
 const MOCK_SETTINGS: Settings = {
   gamePath: '',
-  steamcmdPath: '/usr/bin/steamcmd',
+  backendUrl: 'http://localhost:8080',
   cacheLocation: '~/PZLauncher/cache',
   profilesLocation: '~/PZLauncher/profiles',
   maxConcurrent: 3,
