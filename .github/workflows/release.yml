@@ -51,12 +51,12 @@ jobs:
         run: |
           cd apps/launcher-ui
           CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
-            go build -ldflags="-s -w" -o ../../dist/pz-launcher-mac-arm64 .
+            go build -tags desktop -ldflags="-s -w" -o ../../dist/pz-launcher-mac-arm64 .
       - name: Build amd64
         run: |
           cd apps/launcher-ui
           CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
-            go build -ldflags="-s -w" -o ../../dist/pz-launcher-mac-amd64 .
+            go build -tags desktop -ldflags="-s -w" -o ../../dist/pz-launcher-mac-amd64 .
       - name: Universal binary
         run: |
           mkdir -p dist
@@ -84,7 +84,7 @@ jobs:
         run: |
           cd apps/launcher-ui
           $env:CGO_ENABLED = "1"
-          go build -ldflags="-s -w -H windowsgui" -o ../../dist/pz-launcher-windows-amd64.exe .
+          go build -tags desktop -ldflags="-s -w -H windowsgui" -o ../../dist/pz-launcher-windows-amd64.exe .
       - uses: actions/upload-artifact@v4
         with:
           name: windows-binary
@@ -111,7 +111,7 @@ jobs:
         run: |
           cd apps/launcher-ui
           CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-            go build -ldflags="-s -w" -o ../../dist/pz-launcher-linux-amd64 .
+            go build -tags desktop -ldflags="-s -w" -o ../../dist/pz-launcher-linux-amd64 .
       - uses: actions/upload-artifact@v4
         with:
           name: linux-binary
