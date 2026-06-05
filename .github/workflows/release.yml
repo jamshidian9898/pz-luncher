@@ -51,21 +51,54 @@ jobs:
         run: |
           cd apps/launcher-ui
           CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
-            go build -tags desktop -ldflags="-s -w" -o ../../dist/pz-launcher-mac-arm64 .
+            go build -tags desktop -ldflags="-s -w" -o ../../dist/pz-launcher-arm64 .
       - name: Build amd64
         run: |
           cd apps/launcher-ui
           CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
-            go build -tags desktop -ldflags="-s -w" -o ../../dist/pz-launcher-mac-amd64 .
-      - name: Universal binary
+            go build -tags desktop -ldflags="-s -w" -o ../../dist/pz-launcher-amd64 .
+      - name: Create universal .app bundle
         run: |
           mkdir -p dist
-          lipo -create dist/pz-launcher-mac-arm64 dist/pz-launcher-mac-amd64 \
-            -output dist/pz-launcher-mac-universal
+          # Universal binary
+          lipo -create dist/pz-launcher-arm64 dist/pz-launcher-amd64 \
+            -output dist/pz-launcher-universal
+
+          # .app bundle structure
+          APP="dist/PZ Launcher.app"
+          mkdir -p "$APP/Contents/MacOS"
+          mkdir -p "$APP/Contents/Resources"
+          cp dist/pz-launcher-universal "$APP/Contents/MacOS/PZ Launcher"
+          chmod +x "$APP/Contents/MacOS/PZ Launcher"
+
+          # Info.plist
+          cat > "$APP/Contents/Info.plist" << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key><string>PZ Launcher</string>
+            <key>CFBundleDisplayName</key><string>PZ Launcher</string>
+            <key>CFBundleIdentifier</key><string>com.pzlauncher.app</string>
+            <key>CFBundleVersion</key><string>1.0.0</string>
+            <key>CFBundleShortVersionString</key><string>1.0.0-beta</string>
+            <key>CFBundleExecutable</key><string>PZ Launcher</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>NSHighResolutionCapable</key><true/>
+            <key>LSMinimumSystemVersion</key><string>12.0</string>
+          </dict>
+          </plist>
+          EOF
+
+          # Create .dmg
+          hdiutil create -volname "PZ Launcher" \
+            -srcfolder "dist/PZ Launcher.app" \
+            -ov -format UDZO \
+            "dist/PZ-Launcher-mac.dmg"
       - uses: actions/upload-artifact@v4
         with:
           name: mac-binaries
-          path: dist/pz-launcher-mac-*
+          path: dist/PZ-Launcher-mac.dmg
 
   build-windows:
     name: Build Windows
@@ -135,7 +168,7 @@ jobs:
             ## Beta Release
 
             ### Install
-            - **macOS**: Download `pz-launcher-mac-universal`, `chmod +x`, run
+            - **macOS**: Download `PZ-Launcher-mac.dmg`, open, drag to Applications
             - **Windows**: Download `pz-launcher-windows-amd64.exe`, run
             - **Linux**: Download `pz-launcher-linux-amd64`, `chmod +x`, run
 
