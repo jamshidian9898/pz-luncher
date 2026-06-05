@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -33,7 +35,20 @@ func NewApp() *App {
 // startup is called when the app starts
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	// In production, set workspace root to exe directory so pipeline can find config/
+	if exeDir := getExeDir(); exeDir != "" {
+		_ = os.Setenv("PZ_LAUNCHER_ROOT", exeDir)
+	}
 	a.ui.SetContext(ctx)
+	a.ui.ReloadConfig()
+}
+
+func getExeDir() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return filepath.Dir(exe)
 }
 
 // JoinServer starts joining a server with mod resolution

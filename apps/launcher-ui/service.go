@@ -46,6 +46,16 @@ func (s *UIService) getWorkspaceRoot() string {
 	return pipeline.WorkspaceRoot()
 }
 
+// ReloadConfig rebuilds pipeline using the current PZ_LAUNCHER_ROOT env (set in startup).
+func (s *UIService) ReloadConfig() {
+	root := pipeline.WorkspaceRoot()
+	st, _ := settings.Load(root)
+	s.mu.Lock()
+	s.workspaceRoot = root
+	s.pipeline = pipeline.NewService(settings.ToPipelineConfig(root, st))
+	s.mu.Unlock()
+}
+
 // SetContext sets Wails context for events
 func (s *UIService) SetContext(ctx context.Context) {
 	s.ctx = ctx
