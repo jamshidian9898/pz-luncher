@@ -11,6 +11,9 @@ on:
         required: true
         default: 'beta-1'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-frontend:
     name: Build Frontend
@@ -19,7 +22,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+          # Node 22 LTS runs on Node.js 24 actions runtime
           cache: 'npm'
           cache-dependency-path: apps/launcher-ui/frontend/package-lock.json
       - name: Build
@@ -96,7 +100,9 @@ jobs:
         with:
           go-version: '1.22'
       - name: Install webkit2gtk
-        run: sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
       - uses: actions/download-artifact@v4
         with:
           name: frontend-dist
