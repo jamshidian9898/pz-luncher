@@ -4,6 +4,8 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"io/fs"
+	"log"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -132,14 +134,19 @@ type Settings struct {
 func main() {
 	app := NewApp()
 
-	err := wails.Run(&options.App{
+	dist, err := fs.Sub(assets, "frontend/dist")
+	if err != nil {
+		log.Fatal("failed to get frontend/dist sub-fs:", err)
+	}
+
+	err = wails.Run(&options.App{
 		Title:     "PZ Launcher",
 		Width:     1200,
 		Height:    800,
 		MinWidth:  900,
 		MinHeight: 600,
 		AssetServer: &assetserver.Options{
-			Assets: assets,
+			Assets: dist,
 		},
 		BackgroundColour: &options.RGBA{R: 15, G: 23, B: 42, A: 255},
 		OnStartup:        app.startup,
