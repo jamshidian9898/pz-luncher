@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Settings } from '../types';
 import { useSettingsStore } from '../stores/settings.store';
-import { Folder, Save, RefreshCw } from 'lucide-react';
+import { HealthCheck } from './HealthCheck';
+import { DiagnosticsButton } from './DiagnosticsButton';
+import { Folder, Save, RefreshCw, SlidersHorizontal, ShieldCheck } from 'lucide-react';
+
+type Tab = 'general' | 'health';
 
 export function SettingsPanel() {
   const settings = useSettingsStore((state) => state.settings);
@@ -10,6 +14,7 @@ export function SettingsPanel() {
   const saveSettings = useSettingsStore((state) => state.saveSettings);
   const setSettings = useSettingsStore((state) => state.setSettings);
   const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState<Tab>('general');
 
   useEffect(() => {
     fetchSettings();
@@ -33,8 +38,30 @@ export function SettingsPanel() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      {/* Paths */}
-      <SettingSection title="Paths">
+      {/* Tab bar */}
+      <div className="flex gap-1 p-1 bg-slate-800 rounded-lg w-fit">
+        <TabButton icon={<SlidersHorizontal size={14} />} label="General" active={tab === 'general'} onClick={() => setTab('general')} />
+        <TabButton icon={<ShieldCheck size={14} />} label="Health Check" active={tab === 'health'} onClick={() => setTab('health')} />
+      </div>
+
+      {tab === 'health' && (
+        <div className="space-y-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-5">
+            <HealthCheck />
+          </div>
+          <div className="bg-slate-800 border border-slate-700 rounded-lg px-5 py-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-200">Diagnostics</p>
+              <p className="text-xs text-slate-500 mt-0.5">Copy system state as JSON — send this when reporting a bug</p>
+            </div>
+            <DiagnosticsButton />
+          </div>
+        </div>
+      )}
+
+      {tab === 'general' && (
+        <>
+        <SettingSection title="Paths">
         <SettingRow label="Game Install (PZ_PATH)">
           <input
             type="text"
@@ -162,7 +189,22 @@ export function SettingsPanel() {
           )}
         </button>
       </div>
+        </>
+      )}
     </div>
+  );
+}
+
+function TabButton({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+        active ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+      }`}
+    >
+      {icon}{label}
+    </button>
   );
 }
 

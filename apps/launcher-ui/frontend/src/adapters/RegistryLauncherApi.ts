@@ -1,8 +1,8 @@
 import { LauncherApi } from '../interfaces/LauncherApi';
 import { ServerManifest, ServerRegistry } from '../contracts/generated';
 import { ServerInfo, ServerDetails, SessionStatus, ModInfo } from '../types';
-import { LauncherEvent, LauncherEventType } from '../interfaces/LauncherEvent';
 import { launcherEventBus } from './eventBus';
+import { sseEventsApi } from './SseEventsApi';
 
 const REGISTRY_BASE = '/registry';
 const API_BASE = '/api';
@@ -78,49 +78,14 @@ export class RegistryLauncherApi implements LauncherApi {
   }
 
   async joinServer(serverId: string): Promise<void> {
-    const sessionId = `session-${Date.now()}`;
-    const now = () => Math.floor(Date.now() / 1000);
-    const emit = (e: LauncherEvent) => launcherEventBus.emit(e);
-
-    emit({
-      type: LauncherEventType.SessionStart,
-      timestamp: now(),
-      sessionId,
-      payload: { metadata: { serverId } },
+    const result = await fetchJSON<{ sessionId: string; serverId: string }>(
+      `${API_BASE}/join/${encodeURIComponent(serverId)}`,
+      { method: 'POST' }
+    );
+    const { sessionId } = result;
+    sseEventsApi.subscribeSession(sessionId, (event) => {
+      launcherEventBus.emit(event);
     });
-    emit({
-      type: LauncherEventType.ModResolveStart,
-      timestamp: now(),
-      sessionId,
-    });
-
-    try {
-      const result = await fetchJSON<{ sessionId: string; ready: boolean }>(
-        `${API_BASE}/join/${encodeURIComponent(serverId)}`,
-        { method: 'POST' }
-      );
-
-      emit({
-        type: LauncherEventType.ModResolveComplete,
-        timestamp: now(),
-        sessionId: result.sessionId || sessionId,
-        payload: { metadata: { serverId } },
-      });
-      emit({
-        type: LauncherEventType.SessionComplete,
-        timestamp: now(),
-        sessionId: result.sessionId || sessionId,
-        payload: { metadata: { ready: result.ready } },
-      });
-    } catch (err) {
-      emit({
-        type: LauncherEventType.Error,
-        timestamp: now(),
-        sessionId,
-        payload: { error: err instanceof Error ? err.message : String(err) },
-      });
-      throw err;
-    }
   }
 
   async launchServer(serverId: string): Promise<void> {

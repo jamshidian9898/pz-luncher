@@ -87,6 +87,10 @@ function applySessionPatch(patch: LauncherEventPatch['session']) {
     sessionStore.setLaunchState(patch.launchState);
   }
 
+  if (patch.lastError !== undefined) {
+    sessionStore.setLastError(patch.lastError);
+  }
+
   if (patch.currentServer !== undefined) {
     sessionStore.setCurrentServer(patch.currentServer);
   }

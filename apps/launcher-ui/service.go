@@ -12,7 +12,7 @@ import (
 	"pzlauncher/libs/settings"
 	"pzlauncher/libs/sharedtypes"
 
-	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // UIService handles UI business logic
@@ -39,7 +39,7 @@ func NewUIService() *UIService {
 	}
 }
 
-func (s *UIService) workspaceRoot() string {
+func (s *UIService) getWorkspaceRoot() string {
 	if s.workspaceRoot != "" {
 		return s.workspaceRoot
 	}
@@ -53,7 +53,7 @@ func (s *UIService) SetContext(ctx context.Context) {
 
 func (s *UIService) emitEvent(event UIEvent) {
 	if s.ctx != nil {
-		application.EventsEmit(s.ctx, "launcher:event", event)
+		runtime.EventsEmit(s.ctx, "launcher:event", event)
 	}
 	s.updateSessionFromEvent(event)
 }
@@ -182,7 +182,7 @@ func (s *UIService) LaunchServer(serverID string) error {
 
 // GetServerList loads servers from examples/servers.json
 func (s *UIService) GetServerList() []ServerInfo {
-	reg, err := manifestv1.LoadRegistry(filepath.Join(s.workspaceRoot(), "examples", "servers.json"))
+	reg, err := manifestv1.LoadRegistry(filepath.Join(s.getWorkspaceRoot(), "examples", "servers.json"))
 	if err != nil {
 		return fallbackServerList()
 	}
@@ -213,12 +213,12 @@ func fallbackServerList() []ServerInfo {
 }
 
 func (s *UIService) loadManifestForDescriptor(d *manifestv1.ServerDescriptor) (*manifestv1.ServerManifest, error) {
-	return manifestv1.LoadFile(filepath.Join(s.workspaceRoot(), d.ManifestPath))
+	return manifestv1.LoadFile(filepath.Join(s.getWorkspaceRoot(), d.ManifestPath))
 }
 
 // GetServerDetails returns manifest-driven mod list
 func (s *UIService) GetServerDetails(serverID string) (*ServerDetails, error) {
-	reg, err := manifestv1.LoadRegistry(filepath.Join(s.workspaceRoot(), "examples", "servers.json"))
+	reg, err := manifestv1.LoadRegistry(filepath.Join(s.getWorkspaceRoot(), "examples", "servers.json"))
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +278,7 @@ func (s *UIService) RepairCache() error {
 
 // GetSettings returns launcher settings (RFC-0036)
 func (s *UIService) GetSettings() (*Settings, error) {
-	st, err := settings.Load(s.workspaceRoot())
+	st, err := settings.Load(s.getWorkspaceRoot())
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +288,7 @@ func (s *UIService) GetSettings() (*Settings, error) {
 // SaveSettings saves settings
 func (s *UIService) SaveSettings(ui Settings) error {
 	st := uiToShared(ui)
-	root := s.workspaceRoot()
+	root := s.getWorkspaceRoot()
 	if err := settings.Save(root, st); err != nil {
 		return err
 	}

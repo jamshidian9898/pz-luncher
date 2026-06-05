@@ -2,15 +2,23 @@ package main
 
 import (
 	"context"
+	"embed"
 	"fmt"
 
-	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/options"
+	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
+	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
+
+//go:embed all:frontend/dist
+var assets embed.FS
 
 // App struct
 type App struct {
-	ctx    context.Context
-	ui     *UIService
+	ctx context.Context
+	ui  *UIService
 }
 
 // NewApp creates a new App application struct
@@ -20,8 +28,8 @@ func NewApp() *App {
 	}
 }
 
-// OnStartup is called when the app starts
-func (a *App) OnStartup(ctx context.Context) {
+// startup is called when the app starts
+func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.ui.SetContext(ctx)
 }
@@ -82,32 +90,32 @@ type ServerInfo struct {
 // ServerDetails contains full server information
 type ServerDetails struct {
 	ServerInfo
-	Mods         []ModInfo `json:"mods"`
-	TotalSize    int64     `json:"totalSize"`
-	InstalledSize int64    `json:"installedSize"`
-	MissingSize  int64     `json:"missingSize"`
+	Mods          []ModInfo `json:"mods"`
+	TotalSize     int64     `json:"totalSize"`
+	InstalledSize int64     `json:"installedSize"`
+	MissingSize   int64     `json:"missingSize"`
 }
 
 // ModInfo represents a mod
 type ModInfo struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	WorkshopID  string `json:"workshopId"`
-	Size        int64  `json:"size"`
-	Installed   bool   `json:"installed"`
-	UpToDate    bool   `json:"upToDate"`
-	Required    bool   `json:"required"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	WorkshopID string `json:"workshopId"`
+	Size       int64  `json:"size"`
+	Installed  bool   `json:"installed"`
+	UpToDate   bool   `json:"upToDate"`
+	Required   bool   `json:"required"`
 }
 
 // SessionStatus shows current operation progress
 type SessionStatus struct {
-	SessionID     string         `json:"sessionId"`
-	State         string         `json:"state"` // resolving, downloading, installing, complete
-	Progress      float64        `json:"progress"`
-	CurrentMod    string         `json:"currentMod,omitempty"`
-	DownloadSpeed int64          `json:"downloadSpeed,omitempty"`
-	ETA           int            `json:"eta,omitempty"`
-	Errors        []string       `json:"errors,omitempty"`
+	SessionID     string   `json:"sessionId"`
+	State         string   `json:"state"` // resolving, downloading, installing, complete
+	Progress      float64  `json:"progress"`
+	CurrentMod    string   `json:"currentMod,omitempty"`
+	DownloadSpeed int64    `json:"downloadSpeed,omitempty"`
+	ETA           int      `json:"eta,omitempty"`
+	Errors        []string `json:"errors,omitempty"`
 }
 
 // Settings for the launcher (RFC-0036 — mirrors shared/contracts/settings.schema.json)
@@ -124,32 +132,34 @@ type Settings struct {
 func main() {
 	app := NewApp()
 
-	wailsApp := application.New(application.Options{
-		Title:  "PZ Launcher",
-		Width:  1200,
-		Height: 800,
-		Assets: application.AlphaAssets,
-		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: true,
-		},
-	})
-
-	wailsApp.Bind(app)
-
-	// Create window
-	window := wailsApp.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
+	err := wails.Run(&options.App{
 		Title:     "PZ Launcher",
 		Width:     1200,
 		Height:    800,
 		MinWidth:  900,
 		MinHeight: 600,
+		AssetServer: &assetserver.Options{
+			Assets: assets,
+		},
+		BackgroundColour: &options.RGBA{R: 15, G: 23, B: 42, A: 255},
+		OnStartup:        app.startup,
+		Bind: []interface{}{
+			app,
+		},
+		Mac: &mac.Options{
+			TitleBar: mac.TitleBarHiddenInset(),
+			About: &mac.AboutInfo{
+				Title:   "PZ Launcher",
+				Message: "Beta 1",
+			},
+		},
+		Windows: &windows.Options{
+			WebviewIsTransparent: false,
+			WindowIsTranslucent:  false,
+			DisableWindowIcon:    false,
+		},
 	})
-
-	// Load frontend
-	window.LoadURL("http://localhost:5173")
-
-	// Run app
-	if err := wailsApp.Run(); err != nil {
+	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}
 }

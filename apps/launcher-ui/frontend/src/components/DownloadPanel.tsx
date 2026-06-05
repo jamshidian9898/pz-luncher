@@ -1,5 +1,5 @@
 import { SessionStatus } from '../types';
-import { Download, CheckCircle, Loader2 } from 'lucide-react';
+import { Download, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 
 interface DownloadPanelProps {
   sessions: SessionStatus[];
@@ -9,8 +9,8 @@ export function DownloadPanel({ sessions }: DownloadPanelProps) {
   const activeSessions = sessions.filter(
     s => s.state === 'downloading' || s.state === 'resolving' || s.state === 'installing'
   );
-
   const completedSessions = sessions.filter(s => s.state === 'complete');
+  const failedSessions = sessions.filter(s => s.state === 'error');
 
   if (sessions.length === 0) {
     return (
@@ -33,6 +33,20 @@ export function DownloadPanel({ sessions }: DownloadPanelProps) {
           <div className="space-y-3">
             {activeSessions.map(session => (
               <DownloadCard key={session.sessionId} session={session} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Failed */}
+      {failedSessions.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-red-400 mb-3 uppercase tracking-wide">
+            Failed ({failedSessions.length})
+          </h3>
+          <div className="space-y-2">
+            {failedSessions.map(session => (
+              <ErrorCard key={session.sessionId} session={session} />
             ))}
           </div>
         </div>
@@ -112,6 +126,21 @@ function CompletedCard({ session }: { session: SessionStatus }) {
         Session {session.sessionId.slice(-8)}
       </span>
       <span className="text-xs text-emerald-400">Ready</span>
+    </div>
+  );
+}
+
+function ErrorCard({ session }: { session: SessionStatus }) {
+  const lastError = session.errors?.[session.errors.length - 1] ?? 'Unknown error';
+  return (
+    <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <AlertCircle size={16} className="text-red-400 shrink-0" />
+        <span className="text-sm font-medium text-red-300">
+          Session {session.sessionId.slice(-8)} failed
+        </span>
+      </div>
+      <p className="text-xs text-red-400 font-mono break-all">{lastError}</p>
     </div>
   );
 }

@@ -1,39 +1,63 @@
-import { useState, ReactNode } from 'react';
-import { ServerList } from './components/ServerList';
+import { useState, ReactNode, useEffect } from 'react';
+import { ServerBrowser } from './components/ServerBrowser';
 import { ServerDetail } from './components/ServerDetail';
 import { DownloadPanel } from './components/DownloadPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { TraceViewer } from './components/TraceViewer';
+import { SessionProgressCard } from './components/SessionProgressCard';
+import { FirstRunWizard } from './components/FirstRunWizard';
 import { useLauncherEvents } from './hooks/useRealEvents';
 import { useDownloadsStore } from './stores/downloads.store';
 import { useServersStore } from './stores/servers.store';
 import { useSessionStore } from './stores/session.store';
+import { useSettingsStore } from './stores/settings.store';
 import { launcherApi } from './wails';
-import { ServerInfo } from './types';
-import { Home, Download, Settings, Activity } from 'lucide-react';
+import { ServerInfo, Settings } from './types';
+import { Home, Download, Settings as SettingsIcon, Activity } from 'lucide-react';
 
 type View = 'servers' | 'downloads' | 'settings' | 'trace';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('servers');
+  const [showWizard, setShowWizard]   = useState(false);
 
   // Phase 2.1: Connect real launcher events → Zustand stores
   useLauncherEvents();
 
   // Phase 2.2: Read state from stores
   const { selectedServer, selectServer } = useServersStore();
-  const { getActiveDownloads } = useDownloadsStore();
-  const launchState = useSessionStore((s) => s.launchState);
+  const { sessions } = useDownloadsStore();
+  const launchState   = useSessionStore((s) => s.launchState);
   const currentServer = useSessionStore((s) => s.currentServer);
+  const { fetchSettings, settings } = useSettingsStore();
+
+  // First Run: show wizard if gamePath is empty
+  useEffect(() => {
+    fetchSettings().then(() => {
+      const s = useSettingsStore.getState().settings;
+      if (s && !s.gamePath) setShowWizard(true);
+    });
+  }, [fetchSettings]);
 
   const handleJoinServer = async (server: ServerInfo) => {
+    useSessionStore.getState().resetSession();
+    useSessionStore.getState().setCurrentServer(server);
+    selectServer(null);
+    setCurrentView('downloads');
     try {
-      useSessionStore.getState().setCurrentServer(server);
       await launcherApi.joinServer(server.id);
-      setCurrentView('downloads');
     } catch (err) {
       console.error('Failed to join server:', err);
     }
+  };
+
+  const handleRetry = () => {
+    if (currentServer) handleJoinServer(currentServer);
+  };
+
+  const handleRepairCache = async () => {
+    // RFC-0040: repair cache via settings reset — placeholder for now
+    alert('Cache repair: clear ' + (settings?.cacheLocation || './cache') + ' and retry.');
   };
 
   const handleLaunchServer = async (server: ServerInfo) => {
@@ -46,10 +70,11 @@ function App() {
 
   const canLaunch =
     launchState === 'complete' &&
-    currentServer != null &&
-    selectedServer?.id === currentServer.id;
+    currentServer != null;
 
-  const hasActiveDownloads = getActiveDownloads().length > 0;
+  const hasActiveDownloads = Array.from(sessions.values()).some(
+    s => s.state === 'downloading' || s.state === 'resolving' || s.state === 'installing'
+  );
 
   return (
     <div className="flex h-screen bg-slate-900 text-slate-100 font-sans">
@@ -81,18 +106,25 @@ function App() {
             onClick={() => setCurrentView('trace')}
           />
           <SidebarButton 
-            icon={<Settings size={20} />}
+            icon={<SettingsIcon size={20} />}
             label="Settings"
             active={currentView === 'settings'}
             onClick={() => setCurrentView('settings')}
           />
         </nav>
         
-        <div className="p-4 border-t border-slate-700">
-          <div className="flex items-center gap-2 text-sm text-slate-400">
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>Ready</span>
-          </div>
+        <div className="p-4 border-t border-slate-700 space-y-3">
+          <SessionProgressCard
+            onLaunch={canLaunch && currentServer ? () => handleLaunchServer(currentServer) : undefined}
+            onRetry={launchState === 'error' ? handleRetry : undefined}
+            onRepairCache={launchState === 'error' ? handleRepairCache : undefined}
+          />
+          {!currentServer && (
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>Ready</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -109,14 +141,11 @@ function App() {
 
         <main className="flex-1 overflow-auto p-6">
           {currentView === 'servers' && (
-            <ServerList 
-              onSelectServer={(server) => selectServer(server)}
-              onJoinServer={handleJoinServer}
-            />
+            <ServerBrowser onJoin={handleJoinServer} />
           )}
           
           {currentView === 'downloads' && (
-            <DownloadPanel sessions={getActiveDownloads()} />
+            <DownloadPanel sessions={Array.from(sessions.values())} />
           )}
           
           {currentView === 'settings' && <SettingsPanel />}
@@ -127,7 +156,14 @@ function App() {
         </main>
       </div>
 
-      {/* Server Detail Modal */}
+      {/* First Run Wizard */}
+      {showWizard && (
+        <FirstRunWizard
+          onComplete={(_s: Settings) => setShowWizard(false)}
+        />
+      )}
+
+      {/* Server Detail Modal (legacy — still used from ServersStore) */}
       {selectedServer && (
         <ServerDetail 
           server={selectedServer}

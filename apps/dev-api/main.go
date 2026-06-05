@@ -3,17 +3,75 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"pzlauncher/libs/pipeline"
 	"pzlauncher/libs/settings"
 	"pzlauncher/libs/sharedtypes"
 )
+
+// sseBroker broadcasts pipeline events to SSE clients keyed by sessionId.
+type sseBroker struct {
+	mu      sync.RWMutex
+	clients map[string][]chan pipeline.Event
+}
+
+func newSSEBroker() *sseBroker {
+	return &sseBroker{clients: make(map[string][]chan pipeline.Event)}
+}
+
+func (b *sseBroker) subscribe(sessionID string) chan pipeline.Event {
+	ch := make(chan pipeline.Event, 64)
+	b.mu.Lock()
+	b.clients[sessionID] = append(b.clients[sessionID], ch)
+	b.mu.Unlock()
+	return ch
+}
+
+func (b *sseBroker) unsubscribe(sessionID string, ch chan pipeline.Event) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	list := b.clients[sessionID]
+	for i, c := range list {
+		if c == ch {
+			b.clients[sessionID] = append(list[:i], list[i+1:]...)
+			break
+		}
+	}
+	if len(b.clients[sessionID]) == 0 {
+		delete(b.clients, sessionID)
+	}
+}
+
+func (b *sseBroker) publish(ev pipeline.Event) {
+	b.mu.RLock()
+	list := b.clients[ev.SessionID]
+	copied := make([]chan pipeline.Event, len(list))
+	copy(copied, list)
+	b.mu.RUnlock()
+	for _, ch := range copied {
+		select {
+		case ch <- ev:
+		default:
+		}
+	}
+}
+
+func (b *sseBroker) emitterFor(sessionID string) pipeline.Emitter {
+	return func(ev pipeline.Event) {
+		ev.SessionID = sessionID
+		log.Printf("[event] %s sid=%s pkg=%s", ev.Type, ev.SessionID, ev.PackageID)
+		b.publish(ev)
+	}
+}
 
 const addr = ":8765"
 
@@ -22,6 +80,7 @@ func main() {
 	st, _ := settings.Load(root)
 	settings.ApplyGamePathEnv(st)
 	svc := pipeline.NewService(settings.ToPipelineConfig(root, st))
+	broker := newSSEBroker()
 
 	var mu sync.Mutex
 	lastJoin := make(map[string]*pipeline.JoinResult)
@@ -65,21 +124,56 @@ func main() {
 
 	mux.HandleFunc("POST /api/join/{serverId}", func(w http.ResponseWriter, r *http.Request) {
 		serverID := r.PathValue("serverId")
-		result, err := svc.RunJoin(r.Context(), serverID, func(ev pipeline.Event) {
-			log.Printf("[event] %s", ev.Type)
+		sessionID := fmt.Sprintf("session-%d", nowUnix())
+		emit := broker.emitterFor(sessionID)
+		go func() {
+			result, err := svc.RunJoin(context.Background(), serverID, emit)
+			if err != nil {
+				emit(pipeline.Event{Type: "error", Error: err.Error()})
+				return
+			}
+			mu.Lock()
+			lastJoin[serverID] = result
+			mu.Unlock()
+		}()
+		writeJSON(w, map[string]interface{}{
+			"sessionId": sessionID,
+			"serverId":  serverID,
 		})
-		if err != nil {
-			http.Error(w, err.Error(), 500)
+	})
+
+	mux.HandleFunc("GET /api/events/{sessionId}", func(w http.ResponseWriter, r *http.Request) {
+		sessionID := r.PathValue("sessionId")
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("X-Accel-Buffering", "no")
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming not supported", http.StatusInternalServerError)
 			return
 		}
-		mu.Lock()
-		lastJoin[serverID] = result
-		mu.Unlock()
-		writeJSON(w, map[string]interface{}{
-			"sessionId":   result.SessionID,
-			"profilePath": result.ProfilePath,
-			"ready":       result.Ready,
-		})
+		ch := broker.subscribe(sessionID)
+		defer broker.unsubscribe(sessionID, ch)
+		for {
+			select {
+			case ev, ok := <-ch:
+				if !ok {
+					return
+				}
+				data, err := json.Marshal(ev)
+				if err != nil {
+					continue
+				}
+				fmt.Fprintf(w, "data: %s\n\n", data)
+				flusher.Flush()
+				if ev.Type == "session.complete" || ev.Type == "error" {
+					return
+				}
+			case <-r.Context().Done():
+				return
+			}
+		}
 	})
 
 	mux.HandleFunc("POST /api/launch/{serverId}", func(w http.ResponseWriter, r *http.Request) {
@@ -93,13 +187,13 @@ func main() {
 		}
 		st, _ := settings.Load(root)
 		settings.ApplyGamePathEnv(st)
-		if err := svc.Launch(r.Context(), serverID, result.ProfilePath, func(ev pipeline.Event) {
-			log.Printf("[launch] %s", ev.Type)
-		}); err != nil {
+		launchSessionID := fmt.Sprintf("launch-%d", nowUnix())
+		emit := broker.emitterFor(launchSessionID)
+		if err := svc.Launch(r.Context(), serverID, result.ProfilePath, emit); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		writeJSON(w, map[string]string{"status": "ok"})
+		writeJSON(w, map[string]string{"status": "ok", "sessionId": launchSessionID})
 	})
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -155,4 +249,8 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 func readBody(r *http.Request) ([]byte, error) {
 	defer r.Body.Close()
 	return io.ReadAll(r.Body)
+}
+
+func nowUnix() int64 {
+	return time.Now().UnixNano()
 }

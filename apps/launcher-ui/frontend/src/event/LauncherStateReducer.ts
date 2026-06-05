@@ -23,6 +23,7 @@ export interface SessionEventPatch {
   currentSessionId?: string | null;
   launchState?: LaunchState;
   currentServer?: ServerInfo | null;
+  lastError?: string | null;
   resetSession?: boolean;
 }
 
@@ -276,6 +277,7 @@ export function reduceLauncherEvent(
           : undefined,
         session: {
           launchState: 'error',
+          lastError: event.payload?.error ?? 'Unknown error',
         },
         trace: {
           addEvents: [
