@@ -22,16 +22,28 @@ interface CheckState {
   result: CheckResult | null;
 }
 
+/* ── helpers ── */
+const isWails = (): boolean => typeof (window as any).go !== 'undefined';
+
 /* ── Checks definition ── */
 const CHECKS: Check[] = [
   {
     id: 'api',
-    label: 'Dev API reachable',
-    description: 'GET /api/settings responds',
+    label: 'Backend reachable',
+    description: 'App backend responds to settings request',
     run: async () => {
+      if (isWails()) {
+        try {
+          const go = (window as any).go;
+          await go.main.App.GetSettings();
+          return { status: 'ok', message: 'Wails backend is up' };
+        } catch (e: any) {
+          return { status: 'fail', message: String(e), action: 'Restart the launcher' };
+        }
+      }
       try {
         const r = await fetch('/api/settings', { signal: AbortSignal.timeout(3000) });
-        if (r.ok) return { status: 'ok', message: 'API is up' };
+        if (r.ok) return { status: 'ok', message: 'Dev API is up' };
         return { status: 'fail', message: `HTTP ${r.status}`, action: 'Make sure dev-api is running on :8765' };
       } catch {
         return { status: 'fail', message: 'Could not reach API', action: 'Run: go run ./apps/dev-api' };
@@ -85,42 +97,40 @@ const CHECKS: Check[] = [
   },
   {
     id: 'sse',
-    label: 'SSE streaming works',
-    description: 'EventSource connects to /api/events/health-check',
+    label: 'Event system works',
+    description: 'Wails events or SSE streaming available',
     run: async () => {
+      if (isWails()) {
+        return { status: 'ok', message: 'Wails event system active' };
+      }
       return new Promise((resolve) => {
         const timeout = setTimeout(() => {
-          resolve({ status: 'warn', message: 'No response in 2s (normal if no active session)', action: 'SSE endpoint exists but no events were sent — this is expected' });
+          resolve({ status: 'warn', message: 'No SSE response in 2s — normal for empty session' });
         }, 2000);
-
         try {
           const es = new EventSource('/api/events/health-check');
-          es.onopen = () => {
-            clearTimeout(timeout);
-            es.close();
-            resolve({ status: 'ok', message: 'EventSource connected successfully' });
-          };
-          es.onerror = () => {
-            clearTimeout(timeout);
-            es.close();
-            resolve({ status: 'warn', message: 'SSE connected but immediately closed — normal for empty session', action: 'Try joining a server to test full SSE flow' });
-          };
+          es.onopen = () => { clearTimeout(timeout); es.close(); resolve({ status: 'ok', message: 'SSE connected' }); };
+          es.onerror = () => { clearTimeout(timeout); es.close(); resolve({ status: 'warn', message: 'SSE closed immediately — normal without active session' }); };
         } catch {
           clearTimeout(timeout);
-          resolve({ status: 'fail', message: 'EventSource not supported or blocked' });
+          resolve({ status: 'fail', message: 'EventSource not supported' });
         }
       });
     },
   },
   {
     id: 'join_api',
-    label: 'Join API endpoint exists',
-    description: 'POST /api/join responds (even with 4xx)',
+    label: 'Join function available',
+    description: 'JoinServer binding or /api/join endpoint responds',
     run: async () => {
+      if (isWails()) {
+        const hasBinding = typeof (window as any).go?.main?.App?.JoinServer === 'function';
+        if (hasBinding) return { status: 'ok', message: 'JoinServer binding ready' };
+        return { status: 'fail', message: 'JoinServer binding not found', action: 'Rebuild the app' };
+      }
       try {
         const r = await fetch('/api/join/__health__', { method: 'POST', signal: AbortSignal.timeout(3000) });
-        if (r.status === 404 || r.status === 400) return { status: 'warn', message: 'Endpoint exists but server not found (expected)', action: 'Add a test server to servers.json' };
-        if (r.ok) return { status: 'ok', message: 'Join API reachable' };
+        if (r.status === 404 || r.status === 400) return { status: 'warn', message: 'Endpoint exists — server not found (expected)' };
         return { status: 'ok', message: `API responded with HTTP ${r.status}` };
       } catch {
         return { status: 'fail', message: 'Join API unreachable', action: 'Make sure dev-api is running' };
