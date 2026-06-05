@@ -51,114 +51,124 @@ The Launcher has no knowledge of:
 
 ---
 
-## Phase A — Backend Core
+## Phase A — Backend Core  ✅ COMPLETE (2026-06-05)
 
-The first real things to build. Everything else depends on this.
+All six milestones shipped. The system is now a trusted distributed content platform.
 
-### A1. Registry API
+### A1. Backend Skeleton  ✅
 
-```http
-GET /servers
-GET /servers/{id}
-```
+`apps/backend/cmd/backend` — HTTP server, flags `-addr`, `-registry`.  
+Endpoints: `GET /api/v1/health`, `GET /api/v1/servers`, `GET /api/v1/servers/{id}`.
 
-Returns server list with metadata. Backed by heartbeat data from Agents.
+### A2. Server Registry  ✅
 
-### A2. Join API
+Launcher migrated from `servers.json` to `GET /api/v1/servers`.  
+`backendUrl` setting replaces `steamcmdPath`.  
+`RegistryLauncherApi` + `UIService.GetServerList` call Backend.
 
-```http
-POST /join/{serverId}
-```
+### A3. Join API  ✅
 
-Response:
+`POST /api/v1/join/{serverId}` returns canonical `JoinResponse`:
 
 ```json
 {
   "sessionId": "...",
-  "manifest": {
-    "serverId": "...",
-    "version": "...",
-    "gameVersion": "...",
-    "mods": [
-      { "id": "...", "name": "...", "version": "...", "sha256": "...", "dependencies": [] }
-    ],
-    "launchArgs": [],
-    "profile": {}
-  },
-  "downloadPlan": [
-    { "modId": "...", "sha256": "...", "sizeBytes": 0, "url": "..." }
-  ]
+  "manifest": { "serverId": "...", "version": "...", "mods": [...], "launchArgs": [], "profile": {} },
+  "downloadPlan": [{ "modId": "...", "sha256": "...", "sizeBytes": 0, "url": "..." }],
+  "issuedAt": "..."
 }
 ```
 
-This single response replaces the v1.x manifest-fetch + provider-selection chain.
+`pipeline.RunJoinFromBackend` — Launcher no longer owns manifest resolution or provider selection.
 
-### A3. Download API
+### A4. Content Store (CAS)  ✅
 
-```http
-GET /mods/{sha256}
-GET /download/{token}
+`GET /api/v1/download/{sha256}` streams blobs.  
+`internal/storage.DiskStore` — content-addressable layout `<root>/<sha256[:2]>/<sha256>`.  
+SHA256 verified on write (`Put`), served with `Cache-Control: immutable`.
+
+### A5. Agent Content Publisher  ✅
+
+`apps/pz-agent` — scan mods dir → hash → PUT blob → PUT manifest → heartbeat.  
+Backend endpoints: `PUT /api/v1/blobs/{sha256}`, `PUT /api/v1/manifests/{serverId}`.  
+Live manifests override disk fixtures; join resolution uses Agent-pushed data immediately.
+
+### A6. Agent Trust Boundary  ✅
+
+`internal/auth.Store` — `Register(serverID) → token`, `Validate(token) → serverID`.  
+`POST /api/v1/agents/register` — bootstrap (no token required).  
+All Agent ingestion endpoints protected by `requireAgentToken` middleware.  
+Agent: `-token` flag, `PZ_AGENT_TOKEN` env, auto-register fallback.  
+`-no-auth` backend flag for dev/test mode.
+
+### Phase A outcome
+
+```text
+Backend  = control plane + CAS storage + manifest authority + auth authority
+Agent    = trusted, identity-bound content publisher node
+Launcher = deterministic executor — no manifest knowledge, no provider logic
 ```
 
-Signed or direct URLs. Launcher downloads blob, verifies SHA256, installs.
-
-### A4. Agent Enrollment
-
-```http
-POST /agents/register   → enrollment token
-POST /agents/heartbeat  → server status, player count
-PUT  /agents/manifest   → submit manifest to Backend
+Trust model:
+```text
+Agent  → authenticated (token)    — write access to blobs/manifests
+Launcher → unauthenticated        — read-only consumer of JoinResponse
+Backend  → single source of truth — decides everything
 ```
-
-Backend-internal. Launcher never calls these.
-
-### A5. One-Time Installation Token
-
-```http
-POST /tokens
-```
-
-Issued to new Launcher clients for first-run authentication.
 
 ---
 
-## Phase B — Agent (minimal)
+## Phase B — Scale + Resilience + Operations
 
-The Agent is not a server manager. It is a content and metadata publisher.
+Phase A delivered the architecture. Phase B makes it production-grade.
 
-Required capabilities only:
+### B1. Observability
+
+Structured logging (JSON), trace IDs propagated through join flow.  
+`GET /api/v1/metrics` — Prometheus-compatible counters (join count, blob hit/miss, agent count).  
+Agent health visible in registry (`lastSeen`, `status` derived from heartbeat staleness).
+
+### B2. Storage Evolution
+
+Extract `storage.Store` to support pluggable backends without Launcher changes:
 
 ```text
-discover mods       — scan server mod folders
-build manifest      — generate ModEntry[] from discovered mods
-serve content       — expose mod blobs to Backend on request
-heartbeat           — report server status at regular interval
+DiskStore    — current (Phase A)
+S3Store      — AWS S3 / Cloudflare R2
+MinIOStore   — self-hosted object storage
 ```
 
-Not in scope for Phase B:
-- Server start/stop management
-- Player management
-- Configuration editing
-- Any UI
+Launcher unchanged — it only knows `GET /api/v1/download/{sha256}`.
+
+### B3. Agent Reliability
+
+Retry model with exponential backoff.  
+Offline blob queue — Agent buffers push attempts when Backend unreachable.  
+Partial sync — skip blobs already verified in store (idempotent by design via SHA256).
+
+### B4. Manifest Versioning
+
+Manifest diff — only changed mods trigger re-download on client.  
+Version history stored by Backend; rollback to previous manifest version.  
+Incremental update plan in JoinResponse (`action: "add" | "remove" | "update"` per mod).
 
 ---
 
 ## Phase C — v1.x Pipeline Removal
 
-Gradual cleanup after Phase A and B are stable:
+Safe to execute after Phase B is stable:
 
 ```text
 Remove from Launcher:
-  - SteamProvider
-  - ServerProvider
-  - servers.json bundled fixture
-  - ModEntry.downloadUrl handling
-  - steamcmdPath from settings
-  - libs/steam
-  - libs/providers (Steam/Server implementations)
+  - libs/manifestv1     (manifest resolution owned by Backend)
+  - libs/modplan        (mod planning owned by Backend)
+  - libs/providers      (SteamProvider, ServerProvider)
+  - libs/resolver       (content resolution owned by Backend)
+  - pipeline.RunJoin    (replaced by RunJoinFromBackend)
+  - fixtures/manifests  (Backend generates manifests from Agent data)
 ```
 
-Each removal is safe once the Backend issues all download URLs via JoinResponse.
+Each removal is safe once the Backend is the sole source of `JoinResponse.downloadPlan`.
 
 ---
 

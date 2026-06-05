@@ -1,4 +1,4 @@
-.PHONY: contracts test join demo dev-api backend ui-dev build-ui build-mac build-windows build-linux build-all
+.PHONY: contracts test join demo dev-api backend agent ui-dev build-ui build-mac build-windows build-linux build-all
 
 APP_DIR   = apps/launcher-ui
 DIST_DIR  = dist
@@ -22,6 +22,9 @@ dev-api:
 
 backend:
 	go run ./apps/backend/cmd/backend
+
+agent:
+	go run ./apps/pz-agent/cmd/agent
 
 ui-dev:
 	cd $(APP_DIR)/frontend && npm run dev

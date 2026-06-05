@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -10,24 +11,55 @@ import (
 	"strings"
 
 	"pzlauncher/apps/backend/internal/api"
+	"pzlauncher/apps/backend/internal/auth"
+	"pzlauncher/apps/backend/internal/obs"
 	"pzlauncher/apps/backend/internal/registry"
+	"pzlauncher/apps/backend/internal/storage"
 )
 
 func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	registryFile := flag.String("registry", "apps/backend/registry.json", "path to registry.json")
+	storeDir := flag.String("store", "apps/backend/store", "content-addressable blob store directory")
+	fixturesDir := flag.String("fixtures", "fixtures", "fixtures root for demo blob seeding")
+	noAuth := flag.Bool("no-auth", false, "disable agent token auth (dev/test only)")
 	flag.Parse()
 
 	reg, err := registry.LoadFromFile(*registryFile)
 	if err != nil {
-		log.Printf("warn: could not load registry file %q: %v — starting with empty registry", *registryFile, err)
+		obs.LogError(context.Background(), "registry.load_failed",
+			"path", *registryFile, "error", err,
+			"msg", "starting with empty registry",
+		)
 		reg = registry.NewMemoryRegistry()
 	}
 
 	baseURL := addrToBaseURL(*addr)
-	mux := api.NewRouter(reg, baseURL)
 
-	log.Printf("backend listening on %s (baseURL: %s)", *addr, baseURL)
+	store, err := storage.NewDiskStore(*storeDir)
+	if err != nil {
+		obs.LogError(context.Background(), "storage.init_failed", "error", err)
+		log.Fatalf("storage: %v", err)
+	}
+	seedDemoBlobs(store, *fixturesDir)
+
+	var tokens *auth.Store
+	if !*noAuth {
+		tokens = auth.NewStore()
+	}
+
+	mux := api.NewRouter(reg, baseURL, store, tokens)
+
+	authMode := "enabled"
+	if *noAuth {
+		authMode = "disabled (dev)"
+	}
+	obs.Log(context.Background(), "backend.start",
+		"addr", *addr,
+		"base_url", baseURL,
+		"store", *storeDir,
+		"auth", authMode,
+	)
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }
 

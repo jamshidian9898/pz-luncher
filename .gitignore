@@ -11,6 +11,14 @@ tmp/
 temp/
 *.tmp
 
+# Backend runtime artifacts
+apps/backend/store/
+profiles/
+sessions/
+
+# Built binaries in root
+/launcher-ui
+
 # Build artifacts
 /tmp/
 /build/

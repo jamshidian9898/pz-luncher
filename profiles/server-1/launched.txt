@@ -1,3 +1,0 @@
-launched at 2026-06-04T14:22:52+03:30
-installation=./pz_executable
-args=
