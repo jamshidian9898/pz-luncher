@@ -300,3 +300,5 @@ jobs:
             artifacts/linux-binary/*
           draft: false
           prerelease: ${{ contains(env.VERSION, 'alpha') || contains(env.VERSION, 'beta') }}
+          make_latest: true
+          fail_on_unmatched_files: false
