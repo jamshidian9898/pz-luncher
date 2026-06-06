@@ -233,7 +233,20 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          path: artifacts/
+          name: server-binaries
+          path: artifacts/server-binaries/
+      - uses: actions/download-artifact@v4
+        with:
+          name: mac-binaries
+          path: artifacts/mac-binaries/
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-binary
+          path: artifacts/windows-binary/
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-binary
+          path: artifacts/linux-binary/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
