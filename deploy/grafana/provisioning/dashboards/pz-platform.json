@@ -1,0 +1,71 @@
+{
+  "title": "PZ Platform",
+  "uid": "pz-platform",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Joins (total)",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "targets": [{ "expr": "sum(pz_join_total)", "legendFormat": "joins" }],
+      "options": { "colorMode": "background" },
+      "fieldConfig": { "defaults": { "color": { "fixedColor": "blue", "mode": "fixed" } } }
+    },
+    {
+      "id": 2, "type": "stat", "title": "Agents Online",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "targets": [{ "expr": "pz_agents_online", "legendFormat": "online" }],
+      "options": { "colorMode": "background" },
+      "fieldConfig": { "defaults": { "color": { "fixedColor": "green", "mode": "fixed" } } }
+    },
+    {
+      "id": 3, "type": "stat", "title": "Agents Degraded",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "targets": [{ "expr": "pz_agents_degraded", "legendFormat": "degraded" }],
+      "options": { "colorMode": "background" },
+      "fieldConfig": { "defaults": { "color": { "fixedColor": "yellow", "mode": "fixed" } } }
+    },
+    {
+      "id": 4, "type": "stat", "title": "Blob Downloads",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "targets": [{ "expr": "pz_blob_download_total", "legendFormat": "downloads" }],
+      "options": { "colorMode": "background" },
+      "fieldConfig": { "defaults": { "color": { "fixedColor": "purple", "mode": "fixed" } } }
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Join Rate (req/min)",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum(rate(pz_join_total[1m])) * 60",
+        "legendFormat": "joins/min"
+      }]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Join Duration p50/p95/p99",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(pz_join_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(pz_join_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(pz_join_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Heartbeats / min",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum(rate(pz_heartbeat_total[1m])) * 60",
+        "legendFormat": "heartbeats/min"
+      }]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Manifest Publishes",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum(increase(pz_manifest_publish_total[5m]))",
+        "legendFormat": "publishes/5m"
+      }]
+    }
+  ]
+}

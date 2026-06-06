@@ -12,9 +12,12 @@ import (
 
 	"pzlauncher/apps/backend/internal/auth"
 	"pzlauncher/apps/backend/internal/join"
+	"pzlauncher/apps/backend/internal/metrics"
 	"pzlauncher/apps/backend/internal/obs"
 	"pzlauncher/apps/backend/internal/registry"
 	"pzlauncher/apps/backend/internal/storage"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // NewRouter builds and returns the Backend HTTP mux.
@@ -27,6 +30,9 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 	agentAuth := requireAgentToken(tokens)
 
 	resolver := join.NewResolver(reg, baseURL, store)
+
+	// Prometheus metrics — GET /metrics
+	mux.Handle("GET /metrics", promhttp.Handler())
 
 	// Health
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -52,8 +58,21 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 
 	// Agent list — GET /api/v1/agents (B1)
 	mux.HandleFunc("GET /api/v1/agents", func(w http.ResponseWriter, _ *http.Request) {
+		agents := reg.ListAgents()
+		var online, degraded, offline int
+		for _, a := range agents {
+			switch a.Status {
+			case registry.AgentOnline:
+				online++
+			case registry.AgentDegraded:
+				degraded++
+			case registry.AgentOffline:
+				offline++
+			}
+		}
+		metrics.UpdateAgentGauges(online, degraded, offline)
 		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"agents": reg.ListAgents(),
+			"agents": agents,
 		})
 	})
 
@@ -62,6 +81,7 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 		serverID := r.PathValue("serverId")
 		sessionID := fmt.Sprintf("sess-%d", time.Now().UnixNano())
 		issuedAt := time.Now().UTC().Format(time.RFC3339)
+		t0 := time.Now()
 
 		traceID := obs.NewTraceID()
 		ctx := obs.WithTrace(r.Context(), traceID)
@@ -81,10 +101,13 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 				code = http.StatusServiceUnavailable
 				errCode = "JOIN_MANIFEST_UNAVAILABLE"
 			}
+			metrics.JoinTotal.WithLabelValues(serverID, "error").Inc()
 			obs.LogError(ctx, "join.http_error", "server_id", serverID, "code", errCode, "error", err)
 			writeError(w, code, errCode, err.Error())
 			return
 		}
+		metrics.JoinTotal.WithLabelValues(serverID, "ok").Inc()
+		metrics.JoinDuration.WithLabelValues(serverID).Observe(time.Since(t0).Seconds())
 		writeJSON(w, http.StatusOK, resp)
 	})
 
@@ -114,6 +137,7 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.Copy(w, rc)
+		metrics.BlobDownloadTotal.Inc()
 	})
 
 	// Agent registration — POST /api/v1/agents/register (A6)
@@ -127,7 +151,11 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 			return
 		}
 		if tokens == nil {
-			writeError(w, http.StatusServiceUnavailable, "AUTH_DISABLED", "auth store not configured")
+			// no-auth dev mode: return a placeholder token so the agent doesn't retry.
+			writeJSON(w, http.StatusOK, map[string]string{
+				"token":    "dev-no-auth",
+				"serverId": req.ServerID,
+			})
 			return
 		}
 		token, err := tokens.Register(req.ServerID)
@@ -171,6 +199,10 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 			writeError(w, http.StatusInternalServerError, "BLOB_STORE_ERROR", err.Error())
 			return
 		}
+		metrics.BlobUploadTotal.Inc()
+		if cl, err2 := strconv.ParseInt(r.Header.Get("Content-Length"), 10, 64); err2 == nil && cl > 0 {
+			metrics.BlobUploadBytes.Add(float64(cl))
+		}
 		obs.Log(r.Context(), "agent.blob_stored",
 			"sha256", sha256hex[:12],
 			"size", r.Header.Get("Content-Length"),
@@ -191,6 +223,8 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 			writeError(w, http.StatusInternalServerError, "MANIFEST_STORE_ERROR", err.Error())
 			return
 		}
+		metrics.ManifestPublishTotal.WithLabelValues(serverID).Inc()
+		metrics.ManifestVersionsTotal.WithLabelValues(serverID).Set(float64(version))
 		obs.Log(r.Context(), "agent.manifest_updated", "server_id", serverID, "version", version)
 		writeJSON(w, http.StatusOK, map[string]interface{}{"version": version, "serverId": serverID})
 	}))
@@ -251,6 +285,23 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 			return
 		}
 		reg.RecordHeartbeat(hbBody.ServerID, hbBody.ModCount, hbBody.Version)
+		metrics.HeartbeatTotal.WithLabelValues(hbBody.ServerID).Inc()
+		// Update agent status gauges after every heartbeat.
+		{
+			all := reg.ListAgents()
+			var on, deg, off int
+			for _, a := range all {
+				switch a.Status {
+				case registry.AgentOnline:
+					on++
+				case registry.AgentDegraded:
+					deg++
+				case registry.AgentOffline:
+					off++
+				}
+			}
+			metrics.UpdateAgentGauges(on, deg, off)
+		}
 		obs.Log(r.Context(), "agent.heartbeat",
 			"server_id", hbBody.ServerID,
 			"mod_count", hbBody.ModCount,

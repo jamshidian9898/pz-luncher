@@ -7,23 +7,107 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. beta-1)'
+        description: 'Version tag (e.g. v2.0.0-beta)'
         required: true
-        default: 'beta-1'
+        default: 'v2.0.0-beta'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  VERSION: ${{ github.ref_name || inputs.version }}
 
 jobs:
+  # ────────────────────────────────────────────────
+  # 1. Server binaries: backend + agent (linux only)
+  # ────────────────────────────────────────────────
+  build-server:
+    name: Build Server Binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Build backend (amd64 + arm64)
+        run: |
+          mkdir -p dist
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
+            go build -ldflags="-s -w -X main.Version=${{ env.VERSION }}" \
+            -o dist/pz-backend-linux-amd64 ./apps/backend/cmd/backend
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
+            go build -ldflags="-s -w -X main.Version=${{ env.VERSION }}" \
+            -o dist/pz-backend-linux-arm64 ./apps/backend/cmd/backend
+
+      - name: Build agent (amd64 + arm64)
+        run: |
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
+            go build -ldflags="-s -w -X main.Version=${{ env.VERSION }}" \
+            -o dist/pz-agent-linux-amd64 ./apps/pz-agent/cmd/agent
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
+            go build -ldflags="-s -w -X main.Version=${{ env.VERSION }}" \
+            -o dist/pz-agent-linux-arm64 ./apps/pz-agent/cmd/agent
+
+      - name: Copy install script
+        run: cp deploy/install-agent.sh dist/install-agent.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-binaries
+          path: dist/
+
+  # ────────────────────────────────────────────────
+  # 2. Docker: backend + agent → DockerHub
+  # ────────────────────────────────────────────────
+  build-docker:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: build-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/backend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/pz-backend:${{ env.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/pz-backend:latest
+
+      - name: Build & push agent
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/pz-agent/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/pz-agent:${{ env.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/pz-agent:latest
+
+  # ────────────────────────────────────────────────
+  # 3. Launcher: macOS, Windows, Linux
+  # ────────────────────────────────────────────────
   build-frontend:
-    name: Build Frontend
+    name: Build Launcher Frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # Node 22 LTS runs on Node.js 24 actions runtime
           cache: 'npm'
           cache-dependency-path: apps/launcher-ui/frontend/package-lock.json
       - name: Build
@@ -32,7 +116,7 @@ jobs:
       - name: Verify wailsjs runtime exists
         run: |
           if [ ! -f "apps/launcher-ui/frontend/src/wailsjs/runtime/runtime.js" ]; then
-            echo "ERROR: wailsjs/runtime/runtime.js missing — commit it to the repo"
+            echo "ERROR: wailsjs/runtime/runtime.js missing"
             exit 1
           fi
       - uses: actions/upload-artifact@v4
@@ -41,14 +125,14 @@ jobs:
           path: apps/launcher-ui/frontend/dist/
 
   build-mac:
-    name: Build macOS
+    name: Build macOS Launcher
     runs-on: macos-latest
     needs: build-frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.23'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -62,24 +146,15 @@ jobs:
         run: wails build -platform darwin/amd64 -ldflags "-s -w"
       - name: Create universal .dmg
         run: |
-          # Merge arm64 + amd64 binaries inside the .app
-          ARM="apps/launcher-ui/build/bin/PZ Launcher.app/Contents/MacOS/PZ Launcher"
-          AMD="apps/launcher-ui/build/bin/PZ Launcher-amd64.app/Contents/MacOS/PZ Launcher"
-
           APP="dist/PZ Launcher.app"
-          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-
-          # Use arm64 app as base, create universal binary
+          mkdir -p dist
           cp -R "apps/launcher-ui/build/bin/PZ Launcher.app/" "$APP/"
           lipo -create \
             "apps/launcher-ui/build/bin/PZ Launcher.app/Contents/MacOS/PZ Launcher" \
             "apps/launcher-ui/build/bin/PZ Launcher-amd64.app/Contents/MacOS/PZ Launcher" \
             -output "$APP/Contents/MacOS/PZ Launcher" 2>/dev/null || true
-
-          # Create .dmg
           hdiutil create -volname "PZ Launcher" \
-            -srcfolder "$APP" \
-            -ov -format UDZO \
+            -srcfolder "$APP" -ov -format UDZO \
             "dist/PZ-Launcher-mac.dmg"
       - uses: actions/upload-artifact@v4
         with:
@@ -87,15 +162,15 @@ jobs:
           path: dist/PZ-Launcher-mac.dmg
 
   build-windows:
-    name: Build Windows
+    name: Build Windows Launcher
     runs-on: windows-latest
     needs: build-frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
-      - name: Install GCC (TDM-GCC via Chocolatey)
+          go-version: '1.23'
+      - name: Install GCC
         run: choco install mingw -y
       - uses: actions/setup-node@v4
         with:
@@ -115,15 +190,15 @@ jobs:
           name: windows-binary
           path: dist/pz-launcher-windows-amd64.exe
 
-  build-linux:
-    name: Build Linux
+  build-linux-launcher:
+    name: Build Linux Launcher
     runs-on: ubuntu-22.04
     needs: build-frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.23'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -145,39 +220,69 @@ jobs:
           name: linux-binary
           path: dist/pz-launcher-linux-amd64
 
+  # ────────────────────────────────────────────────
+  # 4. GitHub Release — attach everything
+  # ────────────────────────────────────────────────
   release:
-    name: Create Release
+    name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-mac, build-windows, build-linux]
+    needs: [build-server, build-docker, build-mac, build-windows, build-linux-launcher]
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts/
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "PZ Launcher ${{ github.ref_name }}"
+          name: "PZ Platform ${{ env.VERSION }}"
           body: |
-            ## Beta Release
+            ## PZ Platform ${{ env.VERSION }}
 
-            ### Install
-            - **macOS**: Download `PZ-Launcher-mac.dmg`, open, drag to Applications
-            - **Windows**: Download `pz-launcher-windows-amd64.exe`, run
-            - **Linux**: Download `pz-launcher-linux-amd64`, `chmod +x`, run
+            ### Backend (Linux Server)
+            ```bash
+            # amd64
+            wget https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/pz-backend-linux-amd64
+            chmod +x pz-backend-linux-amd64
+            ./pz-backend-linux-amd64 -addr :8080 -no-auth
 
-            ### First Run
-            1. Open the launcher
-            2. Go to **Settings → Health Check** and run checks
-            3. Set your game path if needed
-            4. Browse servers and hit **Join**
+            # arm64
+            wget https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/pz-backend-linux-arm64
+            ```
 
-            ### Reporting Bugs
-            Settings → Health Check → **Copy Diagnostics** → paste in Discord
+            ### Agent (Linux Server)
+            ```bash
+            wget https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/pz-agent-linux-amd64
+            chmod +x pz-agent-linux-amd64
+            ./pz-agent-linux-amd64 -server YOUR_SERVER_ID -backend http://BACKEND_IP:8080 -mods /srv/pz-mods
+            ```
+
+            ### Agent Auto-Installer
+            ```bash
+            curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/install-agent.sh | \
+              PZ_BACKEND=http://BACKEND_IP:8080 PZ_SERVER=my-server sh
+            ```
+
+            ### Docker
+            ```bash
+            # Backend
+            docker run -d -p 8080:8080 -v pz-data:/data \
+              ${{ secrets.DOCKERHUB_USERNAME }}/pz-backend:${{ env.VERSION }}
+
+            # Full stack (Backend + Prometheus + Grafana)
+            docker compose -f docker-compose.yml -f docker-compose.ops.yml up -d
+            ```
+
+            ### Launcher (Windows / macOS / Linux)
+            - **Windows**: `pz-launcher-windows-amd64.exe`
+            - **macOS**: `PZ-Launcher-mac.dmg`
+            - **Linux**: `pz-launcher-linux-amd64`
           files: |
+            artifacts/server-binaries/*
             artifacts/mac-binaries/*
             artifacts/windows-binary/*
             artifacts/linux-binary/*
-          draft: true
-          prerelease: true
+          draft: false
+          prerelease: ${{ contains(env.VERSION, 'alpha') || contains(env.VERSION, 'beta') }}

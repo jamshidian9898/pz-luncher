@@ -1,0 +1,31 @@
+version: "3.9"
+
+# PZ Platform — Minimal Stack
+# Run:  docker compose up
+# Admin UI: http://localhost:5175  (npm run dev in apps/admin-ui)
+# Metrics:  http://localhost:8080/metrics
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    image: pz-backend:latest
+    container_name: pz-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - pz-data:/data
+    environment:
+      - PZ_NO_AUTH=false
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  pz-data:
+    driver: local
