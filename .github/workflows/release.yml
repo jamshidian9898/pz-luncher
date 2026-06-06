@@ -63,6 +63,7 @@ jobs:
     name: Docker Build & Push
     runs-on: ubuntu-latest
     needs: build-server
+    environment: docker hub
     steps:
       - uses: actions/checkout@v4
 
