@@ -16,7 +16,7 @@ import (
 // Mod represents a locally discovered mod file.
 type Mod struct {
 	// ID is derived from the filename without extension.
-	ID   string
+	ID string
 	// Name is the human-readable name (same as ID for Phase A).
 	Name string
 	// Path is the absolute path to the mod file/directory.
@@ -52,6 +52,9 @@ func (s *Scanner) Scan() ([]Mod, error) {
 
 	var mods []Mod
 	for _, e := range entries {
+		if shouldSkip(e.Name()) {
+			continue
+		}
 		path := filepath.Join(s.modsDir, e.Name())
 		mod, err := scanEntry(path, e)
 		if err != nil {
@@ -134,6 +137,30 @@ func hashDir(dir string) (string, int64, error) {
 		return "", 0, fmt.Errorf("hashDir %q: %w", dir, err)
 	}
 	return hex.EncodeToString(h.Sum(nil)), total, nil
+}
+
+// shouldSkip returns true for files/directories that are not actual mods.
+func shouldSkip(name string) bool {
+	// Hidden files/dirs.
+	if strings.HasPrefix(name, ".") {
+		return true
+	}
+	// Steam metadata files (appmanifest_*.acf).
+	if strings.HasPrefix(name, "appmanifest_") {
+		return true
+	}
+	// Common non-mod files.
+	lower := strings.ToLower(name)
+	skip := []string{
+		"downloading", "temp", "tmp", "shadercache",
+		"steam_autocloud.vdf", "libraryfolders.vdf",
+	}
+	for _, s := range skip {
+		if lower == s {
+			return true
+		}
+	}
+	return false
 }
 
 // readVersionFile tries to read a version from known version file locations.

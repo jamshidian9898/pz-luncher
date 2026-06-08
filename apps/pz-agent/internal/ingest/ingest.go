@@ -31,7 +31,7 @@ func NewClient(backendURL, serverID string) *Client {
 	return &Client{
 		backendURL: backendURL,
 		serverID:   serverID,
-		httpClient: &http.Client{Timeout: 60 * time.Second},
+		httpClient: &http.Client{Timeout: 10 * time.Minute},
 	}
 }
 
