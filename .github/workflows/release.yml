@@ -29,24 +29,30 @@ jobs:
           go-version: '1.23'
           cache: true
 
-      - name: Build backend (amd64 + arm64)
+      - name: Build all binaries (parallel)
         run: |
+          set -e
           mkdir -p dist
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
             go build -ldflags="-s -w -X main.Version=${{ env.VERSION }}" \
-            -o dist/pz-backend-linux-amd64 ./apps/backend/cmd/backend
+            -o dist/pz-backend-linux-amd64 ./apps/backend/cmd/backend &
+          pid1=$!
           GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
             go build -ldflags="-s -w -X main.Version=${{ env.VERSION }}" \
-            -o dist/pz-backend-linux-arm64 ./apps/backend/cmd/backend
-
-      - name: Build agent (amd64 + arm64)
-        run: |
+            -o dist/pz-backend-linux-arm64 ./apps/backend/cmd/backend &
+          pid2=$!
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
             go build -ldflags="-s -w -X main.Version=${{ env.VERSION }}" \
-            -o dist/pz-agent-linux-amd64 ./apps/pz-agent/cmd/agent
+            -o dist/pz-agent-linux-amd64 ./apps/pz-agent/cmd/agent &
+          pid3=$!
           GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
             go build -ldflags="-s -w -X main.Version=${{ env.VERSION }}" \
-            -o dist/pz-agent-linux-arm64 ./apps/pz-agent/cmd/agent
+            -o dist/pz-agent-linux-arm64 ./apps/pz-agent/cmd/agent &
+          pid4=$!
+          wait $pid1 $pid2 $pid3 $pid4
+
+      - name: Verify build outputs
+        run: ls -la dist/
 
       - name: Copy install script
         run: cp deploy/install-agent.sh dist/install-agent.sh
@@ -62,7 +68,6 @@ jobs:
   build-docker:
     name: Docker Build & Push
     runs-on: ubuntu-latest
-    needs: build-server
     environment: docker hub
     steps:
       - uses: actions/checkout@v4
@@ -228,7 +233,7 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-server, build-docker, build-mac, build-windows, build-linux-launcher]
+    needs: [build-server, build-mac, build-windows, build-linux-launcher]
     permissions:
       contents: write
     steps:
@@ -302,5 +307,5 @@ jobs:
           draft: false
           prerelease: ${{ contains(env.VERSION, 'alpha') || contains(env.VERSION, 'beta') }}
           make_latest: ${{ !contains(env.VERSION, 'alpha') && !contains(env.VERSION, 'beta') }}
-          fail_on_unmatched_files: false
+          fail_on_unmatched_files: true
           overwrite: true
