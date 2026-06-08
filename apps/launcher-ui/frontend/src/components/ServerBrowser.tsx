@@ -108,7 +108,13 @@ export function ServerBrowser({ onJoin }: ServerBrowserProps) {
             ? <DetailSkeleton />
             : details
             ? <DetailPanel details={details} onJoin={() => onJoin(details)} />
-            : null
+            : <DetailPanelFallback
+                server={servers.find(s => s.id === selected)!}
+                onJoin={() => {
+                  const srv = servers.find(s => s.id === selected);
+                  if (srv) onJoin(srv);
+                }}
+              />
         )}
         {!selected && (
           <div className="flex flex-col items-center justify-center h-full text-slate-500">
@@ -259,6 +265,38 @@ function DetailPanel({ details, onJoin }: { details: ServerDetails; onJoin: () =
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Detail Panel Fallback (when details API fails) ── */
+function DetailPanelFallback({ server, onJoin }: { server: ServerInfo; onJoin: () => void }) {
+  return (
+    <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold text-slate-100">{server.name}</h2>
+          <p className="text-sm text-slate-400 mt-1">{server.description}</p>
+        </div>
+        <button
+          onClick={onJoin}
+          className="shrink-0 flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
+        >
+          Join Server
+        </button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <Stat label="Players" value={`${server.playerCount} / ${server.maxPlayers}`} />
+        <Stat label="Ping" value={server.ping > 0 ? `${server.ping}ms` : '—'} />
+        <Stat label="Mods" value={`${server.modCount}`} />
+      </div>
+
+      <div className="bg-slate-900 rounded-lg p-4">
+        <p className="text-sm text-slate-400">
+          Click <span className="text-emerald-400 font-medium">Join Server</span> to install mods and connect.
+        </p>
       </div>
     </div>
   );
