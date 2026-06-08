@@ -28,19 +28,41 @@ import (
 
 	"pzlauncher/apps/pz-agent/internal/discover"
 	"pzlauncher/apps/pz-agent/internal/ingest"
+	"pzlauncher/apps/pz-agent/internal/pzdetect"
 )
 
 func main() {
-	serverID := flag.String("server", "", "server ID this agent manages (required)")
+	serverID := flag.String("server", "", "server ID (auto-detected if omitted)")
 	backendURL := flag.String("backend", "http://localhost:8080", "backend base URL")
-	modsDir := flag.String("mods", "mods", "local mods directory to scan")
+	modsDir := flag.String("mods", "", "local mods directory to scan (auto-detected if omitted)")
 	gameVersion := flag.String("game-version", "42.8", "game version string")
 	interval := flag.Duration("interval", 5*time.Minute, "sync interval (0 = run once and exit)")
 	token := flag.String("token", "", "agent auth token (or set PZ_AGENT_TOKEN env var)")
 	flag.Parse()
 
+	// Auto-detect PZ server if -server or -mods not provided.
+	if *serverID == "" || *modsDir == "" {
+		log.Printf("agent: auto-detecting PZ server...")
+		detected := pzdetect.Detect()
+		if detected != nil {
+			if *serverID == "" {
+				*serverID = detected.ServerName
+				log.Printf("agent: auto-detected server name: %q", *serverID)
+			}
+			if *modsDir == "" {
+				*modsDir = detected.ModsDir
+				log.Printf("agent: auto-detected mods dir: %q", *modsDir)
+			}
+		} else {
+			log.Printf("agent: auto-detection failed — no PZ server found")
+		}
+	}
+
 	if *serverID == "" {
-		log.Fatal("agent: -server flag is required")
+		log.Fatal("agent: could not detect server name. Use -server flag or ensure PZ server is installed.")
+	}
+	if *modsDir == "" {
+		log.Fatal("agent: could not detect mods directory. Use -mods flag or ensure PZ server is installed.")
 	}
 
 	// Root context — cancelled on SIGINT/SIGTERM.
@@ -53,7 +75,7 @@ func main() {
 		effectiveToken = os.Getenv("PZ_AGENT_TOKEN")
 	}
 
-	bootstrapClient := ingest.NewClient(*backendURL, *serverID)
+	bootstrapClient := ingest.NewClient(*backendURL, *serverID).WithServerName(*serverID)
 	if effectiveToken == "" {
 		log.Printf("agent: no token provided, registering with backend...")
 		var err error

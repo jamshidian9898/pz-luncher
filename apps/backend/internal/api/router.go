@@ -142,14 +142,40 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 
 	// Agent registration — POST /api/v1/agents/register (A6)
 	// Not token-protected: this is the bootstrap endpoint.
+	// Auto-creates a server record in the registry if it doesn't exist yet.
 	mux.HandleFunc("POST /api/v1/agents/register", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			ServerID string `json:"serverId"`
+			ServerID    string `json:"serverId"`
+			ServerName  string `json:"serverName,omitempty"`
+			GameVersion string `json:"gameVersion,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ServerID == "" {
 			writeError(w, http.StatusBadRequest, "REGISTER_INVALID", "serverId is required")
 			return
 		}
+
+		// Auto-create server in registry if not already present.
+		if _, exists := reg.Get(req.ServerID); !exists {
+			name := req.ServerName
+			if name == "" {
+				name = req.ServerID
+			}
+			gv := req.GameVersion
+			if gv == "" {
+				gv = "42.8"
+			}
+			reg.Upsert(&registry.ServerRecord{
+				ID:          req.ServerID,
+				Name:        name,
+				Description: "Auto-registered by agent",
+				GameVersion: gv,
+				MaxPlayers:  64,
+				Status:      "online",
+				Tags:        []string{"auto"},
+			})
+			obs.Log(r.Context(), "agent.server_auto_created", "server_id", req.ServerID)
+		}
+
 		if tokens == nil {
 			// no-auth dev mode: return a placeholder token so the agent doesn't retry.
 			writeJSON(w, http.StatusOK, map[string]string{

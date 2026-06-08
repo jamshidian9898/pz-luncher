@@ -1,20 +1,19 @@
 #!/bin/sh
 # PZ Agent Installer
-# Usage:
-#   curl -fsSL http://YOUR_BACKEND/install-agent.sh | \
-#     PZ_BACKEND=http://YOUR_BACKEND \
-#     PZ_SERVER=my-server \
-#     PZ_TOKEN=your-token \
-#     sh
 #
-# Or interactively:
-#   sh install-agent.sh
+# Minimal usage (auto-detects PZ server, mods, and auto-registers):
+#   curl -fsSL http://YOUR_BACKEND/install-agent.sh | PZ_BACKEND=http://YOUR_BACKEND sh
+#
+# Full usage:
+#   PZ_BACKEND=http://192.168.1.10:8080 PZ_SERVER=myserver PZ_TOKEN=xxx sh install-agent.sh
+#
+# The agent will auto-detect the PZ server process, server name, and mods
+# directory if -server and -mods are not provided.
 set -e
 
 PZ_BACKEND="${PZ_BACKEND:-}"
 PZ_SERVER="${PZ_SERVER:-}"
 PZ_TOKEN="${PZ_TOKEN:-}"
-PZ_MODS="${PZ_MODS:-/srv/pz-mods}"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 SERVICE_NAME="pz-agent"
 
@@ -31,18 +30,10 @@ esac
 echo "=== PZ Agent Installer ==="
 echo "Architecture: linux-$ARCH"
 
-# Prompt for missing values (read from /dev/tty so piped input works)
+# Only backend URL is required — server and mods are auto-detected.
 if [ -z "$PZ_BACKEND" ]; then
   printf "Backend URL (e.g. http://192.168.1.10:8080): "
   read -r PZ_BACKEND </dev/tty
-fi
-if [ -z "$PZ_SERVER" ]; then
-  printf "Server ID: "
-  read -r PZ_SERVER </dev/tty
-fi
-if [ -z "$PZ_TOKEN" ]; then
-  printf "Agent token (leave empty for auto-register): "
-  read -r PZ_TOKEN </dev/tty
 fi
 
 # Download binary
@@ -54,8 +45,13 @@ chmod +x /tmp/pz-agent
 mv /tmp/pz-agent "${INSTALL_DIR}/pz-agent"
 echo "Installed: ${INSTALL_DIR}/pz-agent"
 
-# Create mods directory
-mkdir -p "$PZ_MODS"
+# Build ExecStart command — only add flags for explicitly provided values.
+# Agent auto-detects -server and -mods if omitted.
+AGENT_ARGS="-backend ${PZ_BACKEND} -interval 60s"
+[ -n "$PZ_SERVER" ] && AGENT_ARGS="${AGENT_ARGS} -server ${PZ_SERVER}"
+
+ENV_LINE=""
+[ -n "$PZ_TOKEN" ] && ENV_LINE="Environment=PZ_AGENT_TOKEN=${PZ_TOKEN}"
 
 # Write systemd service
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
@@ -68,10 +64,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=${INSTALL_DIR}/pz-agent -server ${PZ_SERVER} -backend ${PZ_BACKEND} -mods ${PZ_MODS} -interval 60s
+ExecStart=${INSTALL_DIR}/pz-agent ${AGENT_ARGS}
 Restart=on-failure
 RestartSec=10s
-Environment=PZ_AGENT_TOKEN=${PZ_TOKEN}
+${ENV_LINE}
 
 [Install]
 WantedBy=multi-user.target
@@ -83,14 +79,15 @@ EOF
 
   echo ""
   echo "=== Agent service installed and started ==="
+  echo "  The agent will auto-detect your PZ server and mods directory."
   echo "  Status:  systemctl status ${SERVICE_NAME}"
   echo "  Logs:    journalctl -u ${SERVICE_NAME} -f"
 else
   echo ""
   echo "=== Manual start (systemd not available or not root) ==="
-  ENV_ARGS=""
-  [ -n "$PZ_TOKEN" ] && ENV_ARGS="PZ_AGENT_TOKEN=${PZ_TOKEN}"
-  echo "  ${ENV_ARGS} ${INSTALL_DIR}/pz-agent -server ${PZ_SERVER} -backend ${PZ_BACKEND} -mods ${PZ_MODS} -interval 60s"
+  RUN_CMD="${INSTALL_DIR}/pz-agent ${AGENT_ARGS}"
+  [ -n "$PZ_TOKEN" ] && RUN_CMD="PZ_AGENT_TOKEN=${PZ_TOKEN} ${RUN_CMD}"
+  echo "  ${RUN_CMD}"
 fi
 
 echo ""

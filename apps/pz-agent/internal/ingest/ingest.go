@@ -21,6 +21,7 @@ import (
 type Client struct {
 	backendURL string
 	serverID   string
+	serverName string // human-readable name sent during registration
 	token      string // X-Agent-Token, empty = unauthenticated
 	httpClient *http.Client
 }
@@ -41,12 +42,23 @@ func (c *Client) WithToken(token string) *Client {
 	return &copy
 }
 
+// WithServerName returns a copy of the client with the given server name set.
+func (c *Client) WithServerName(name string) *Client {
+	copy := *c
+	copy.serverName = name
+	return &copy
+}
+
 // Register calls POST /api/v1/agents/register and returns the issued token.
 // Retried with DefaultPolicy — a backend restart should not prevent enrollment.
 func (c *Client) Register(ctx context.Context) (string, error) {
 	var token string
 	err := retry.DefaultPolicy.Do(ctx, "register", log.Printf, func() error {
-		body := []byte(`{"serverId":"` + c.serverID + `"}`)
+		regBody := map[string]string{"serverId": c.serverID}
+		if c.serverName != "" {
+			regBody["serverName"] = c.serverName
+		}
+		body, _ := json.Marshal(regBody)
 		url := fmt.Sprintf("%s/api/v1/agents/register", c.backendURL)
 		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
