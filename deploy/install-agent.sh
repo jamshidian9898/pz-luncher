@@ -31,18 +31,18 @@ esac
 echo "=== PZ Agent Installer ==="
 echo "Architecture: linux-$ARCH"
 
-# Prompt for missing values
+# Prompt for missing values (read from /dev/tty so piped input works)
 if [ -z "$PZ_BACKEND" ]; then
   printf "Backend URL (e.g. http://192.168.1.10:8080): "
-  read -r PZ_BACKEND
+  read -r PZ_BACKEND </dev/tty
 fi
 if [ -z "$PZ_SERVER" ]; then
   printf "Server ID: "
-  read -r PZ_SERVER
+  read -r PZ_SERVER </dev/tty
 fi
 if [ -z "$PZ_TOKEN" ]; then
   printf "Agent token (leave empty for auto-register): "
-  read -r PZ_TOKEN
+  read -r PZ_TOKEN </dev/tty
 fi
 
 # Download binary
