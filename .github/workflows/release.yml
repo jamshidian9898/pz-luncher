@@ -63,10 +63,10 @@ jobs:
           path: dist/
 
   # ────────────────────────────────────────────────
-  # 2. Docker: backend + agent → DockerHub
+  # 2a. Docker: backend → DockerHub
   # ────────────────────────────────────────────────
-  build-docker:
-    name: Docker Build & Push
+  build-docker-backend:
+    name: Docker Build & Push Backend
     runs-on: ubuntu-latest
     environment: docker hub
     steps:
@@ -91,6 +91,25 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/pz-backend:${{ env.VERSION }}
             ${{ secrets.DOCKERHUB_USERNAME }}/pz-backend:latest
+
+  # ────────────────────────────────────────────────
+  # 2b. Docker: agent → DockerHub
+  # ────────────────────────────────────────────────
+  build-docker-agent:
+    name: Docker Build & Push Agent
+    runs-on: ubuntu-latest
+    environment: docker hub
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build & push agent
         uses: docker/build-push-action@v6
@@ -261,35 +280,58 @@ jobs:
           body: |
             ## PZ Platform ${{ env.VERSION }}
 
+            > ⚠️ This is a **private** repository. Use `gh` CLI to download assets.
+
+            ### Download Assets (Private Repo)
+            ```bash
+            # Install GitHub CLI if needed: https://cli.github.com
+            gh auth login
+            gh release download ${{ env.VERSION }} -R ${{ github.repository }} -p "PATTERN"
+            ```
+
             ### Backend (Linux Server)
             ```bash
             # amd64
-            wget https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/pz-backend-linux-amd64
+            gh release download ${{ env.VERSION }} -R ${{ github.repository }} -p "pz-backend-linux-amd64"
             chmod +x pz-backend-linux-amd64
             ./pz-backend-linux-amd64 -addr :8080 -no-auth
 
             # arm64
-            wget https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/pz-backend-linux-arm64
+            gh release download ${{ env.VERSION }} -R ${{ github.repository }} -p "pz-backend-linux-arm64"
             ```
 
             ### Agent (Linux Server)
             ```bash
-            wget https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/pz-agent-linux-amd64
+            gh release download ${{ env.VERSION }} -R ${{ github.repository }} -p "pz-agent-linux-amd64"
             chmod +x pz-agent-linux-amd64
             ./pz-agent-linux-amd64 -server YOUR_SERVER_ID -backend http://BACKEND_IP:8080 -mods /srv/pz-mods
             ```
 
             ### Agent Auto-Installer
             ```bash
-            curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/install-agent.sh | \
-              PZ_BACKEND=http://BACKEND_IP:8080 PZ_SERVER=my-server sh
+            gh release download ${{ env.VERSION }} -R ${{ github.repository }} -p "install-agent.sh"
+            PZ_BACKEND=http://BACKEND_IP:8080 PZ_SERVER=my-server sh install-agent.sh
             ```
 
             ### Docker
             ```bash
-            # Backend
-            docker run -d -p 8080:8080 -v pz-data:/data \
-              ${{ secrets.DOCKERHUB_USERNAME }}/pz-backend:${{ env.VERSION }}
+            # Backend (with auth disabled for dev)
+            docker run -d --name pz-backend -p 8080:8080 \
+              -v pz-data:/data \
+              ${{ secrets.DOCKERHUB_USERNAME }}/pz-backend:${{ env.VERSION }} \
+              -addr :8080 -no-auth
+
+            # Backend (production with auth)
+            docker run -d --name pz-backend -p 8080:8080 \
+              -v pz-data:/data \
+              ${{ secrets.DOCKERHUB_USERNAME }}/pz-backend:${{ env.VERSION }} \
+              -addr :8080
+
+            # Agent
+            docker run -d --name pz-agent \
+              -v /srv/pz-mods:/mods \
+              ${{ secrets.DOCKERHUB_USERNAME }}/pz-agent:${{ env.VERSION }} \
+              -server YOUR_SERVER_ID -backend http://BACKEND_IP:8080 -mods /mods
 
             # Full stack (Backend + Prometheus + Grafana)
             docker compose -f docker-compose.yml -f docker-compose.ops.yml up -d
