@@ -25,116 +25,105 @@ interface CheckState {
 /* ── helpers ── */
 const isWails = (): boolean => typeof (window as any).go !== 'undefined';
 
+function getBackendUrl(s: any): string {
+  if (s?.backendUrl) return s.backendUrl.replace(/\/$/, '');
+  if (typeof (window as any).__BACKEND_URL__ === 'string') return (window as any).__BACKEND_URL__;
+  return 'http://localhost:8080';
+}
+
 /* ── Checks definition ── */
 const CHECKS: Check[] = [
   {
-    id: 'api',
+    id: 'backend',
     label: 'Backend reachable',
-    description: 'App backend responds to settings request',
-    run: async () => {
-      if (isWails()) {
-        try {
-          const go = (window as any).go;
-          await go.main.App.GetSettings();
-          return { status: 'ok', message: 'Wails backend is up' };
-        } catch (e: any) {
-          return { status: 'fail', message: String(e), action: 'Restart the launcher' };
-        }
-      }
+    description: 'PZ Backend API responds to /api/v1/servers',
+    run: async (s) => {
+      const base = getBackendUrl(s);
       try {
-        const r = await fetch('/api/settings', { signal: AbortSignal.timeout(3000) });
-        if (r.ok) return { status: 'ok', message: 'Dev API is up' };
-        return { status: 'fail', message: `HTTP ${r.status}`, action: 'Make sure dev-api is running on :8765' };
+        const r = await fetch(`${base}/api/v1/servers`, { signal: AbortSignal.timeout(5000) });
+        if (!r.ok) return { status: 'fail', message: `HTTP ${r.status}`, action: `Check backend at ${base}` };
+        const data = await r.json();
+        const count = Array.isArray(data?.servers) ? data.servers.length : 0;
+        return { status: 'ok', message: `Connected — ${count} server(s) registered` };
+      } catch (e: any) {
+        return { status: 'fail', message: e?.message || 'Connection failed', action: `Make sure backend is running at ${base}` };
+      }
+    },
+  },
+  {
+    id: 'servers',
+    label: 'Servers available',
+    description: 'At least one server registered (via agent)',
+    run: async (s) => {
+      const base = getBackendUrl(s);
+      try {
+        const r = await fetch(`${base}/api/v1/servers`, { signal: AbortSignal.timeout(5000) });
+        if (!r.ok) return { status: 'fail', message: `HTTP ${r.status}` };
+        const data = await r.json();
+        const count = Array.isArray(data?.servers) ? data.servers.length : 0;
+        if (count === 0) return { status: 'warn', message: 'No servers yet', action: 'Install agent on your PZ server — it will auto-register' };
+        return { status: 'ok', message: `${count} server${count !== 1 ? 's' : ''} online` };
       } catch {
-        return { status: 'fail', message: 'Could not reach API', action: 'Run: go run ./apps/dev-api' };
+        return { status: 'fail', message: 'Cannot reach backend' };
+      }
+    },
+  },
+  {
+    id: 'agents',
+    label: 'Agent connected',
+    description: 'At least one agent is online and sending heartbeats',
+    run: async (s) => {
+      const base = getBackendUrl(s);
+      try {
+        const r = await fetch(`${base}/api/v1/agents`, { signal: AbortSignal.timeout(5000) });
+        if (!r.ok) return { status: 'warn', message: `HTTP ${r.status}` };
+        const data = await r.json();
+        const agents = Array.isArray(data?.agents) ? data.agents : [];
+        const online = agents.filter((a: any) => a.status === 'online').length;
+        if (online === 0 && agents.length === 0) return { status: 'warn', message: 'No agents registered', action: 'Install agent on PZ server VM' };
+        if (online === 0) return { status: 'warn', message: `${agents.length} agent(s) but none online`, action: 'Check agent process on server' };
+        return { status: 'ok', message: `${online} agent(s) online` };
+      } catch {
+        return { status: 'fail', message: 'Cannot reach backend' };
       }
     },
   },
   {
     id: 'gamepath',
     label: 'Game path configured',
-    description: 'settings.gamePath is set',
+    description: 'PZ installation path is set in settings',
     run: async (s) => {
-      if (!s?.gamePath) return { status: 'fail', message: 'Game path is empty', action: 'Go to Settings and set the game installation path' };
+      if (!s?.gamePath) return { status: 'fail', message: 'Game path is empty', action: 'Go to Settings → General and set the game path' };
       return { status: 'ok', message: s.gamePath };
     },
   },
   {
-    id: 'registry',
-    label: 'Server registry loaded',
-    description: 'At least one server in /registry/servers.json',
-    run: async () => {
-      try {
-        const r = await fetch('/registry/servers.json', { signal: AbortSignal.timeout(3000) });
-        if (!r.ok) return { status: 'fail', message: `HTTP ${r.status}`, action: 'Check public/registry/servers.json' };
-        const data = await r.json();
-        const count = Array.isArray(data?.servers) ? data.servers.length : 0;
-        if (count === 0) return { status: 'warn', message: 'No servers defined', action: 'Add entries to servers.json' };
-        return { status: 'ok', message: `${count} server${count !== 1 ? 's' : ''} found` };
-      } catch {
-        return { status: 'fail', message: 'Registry unreachable', action: 'Make sure Vite proxy is configured for /registry' };
-      }
-    },
-  },
-  {
-    id: 'cache',
-    label: 'Cache directory writable',
-    description: 'settings.cacheLocation is set (or uses default)',
-    run: async (s) => {
-      const path = s?.cacheLocation || '(default ./cache)';
-      if (!s?.cacheLocation) return { status: 'warn', message: 'Using default cache path', action: 'Set a custom cache location in Settings for better control' };
-      return { status: 'ok', message: path };
-    },
-  },
-  {
-    id: 'profiles',
-    label: 'Profiles directory configured',
-    description: 'settings.profilesLocation is set (or uses default)',
-    run: async (s) => {
-      if (!s?.profilesLocation) return { status: 'warn', message: 'Using default profiles path', action: 'Set a custom profiles location in Settings' };
-      return { status: 'ok', message: s.profilesLocation };
-    },
-  },
-  {
-    id: 'sse',
-    label: 'Event system works',
-    description: 'Wails events or SSE streaming available',
-    run: async () => {
-      if (isWails()) {
-        return { status: 'ok', message: 'Wails event system active' };
-      }
-      return new Promise((resolve) => {
-        const timeout = setTimeout(() => {
-          resolve({ status: 'warn', message: 'No SSE response in 2s — normal for empty session' });
-        }, 2000);
-        try {
-          const es = new EventSource('/api/events/health-check');
-          es.onopen = () => { clearTimeout(timeout); es.close(); resolve({ status: 'ok', message: 'SSE connected' }); };
-          es.onerror = () => { clearTimeout(timeout); es.close(); resolve({ status: 'warn', message: 'SSE closed immediately — normal without active session' }); };
-        } catch {
-          clearTimeout(timeout);
-          resolve({ status: 'fail', message: 'EventSource not supported' });
-        }
-      });
-    },
-  },
-  {
     id: 'join_api',
-    label: 'Join function available',
-    description: 'JoinServer binding or /api/join endpoint responds',
+    label: 'Join API works',
+    description: 'POST /join responds correctly',
+    run: async (s) => {
+      const base = getBackendUrl(s);
+      try {
+        const r = await fetch(`${base}/api/v1/join/__health_check__`, { method: 'POST', signal: AbortSignal.timeout(5000) });
+        if (r.status === 404) return { status: 'ok', message: 'Join endpoint active (server not found = expected)' };
+        if (r.status === 409) return { status: 'ok', message: 'Join endpoint active (server offline = expected for health check)' };
+        return { status: 'ok', message: `Join API responded: HTTP ${r.status}` };
+      } catch {
+        return { status: 'fail', message: 'Join API unreachable', action: `Check backend at ${base}` };
+      }
+    },
+  },
+  {
+    id: 'wails',
+    label: 'Launcher runtime',
+    description: 'Wails bindings or dev-api available',
     run: async () => {
       if (isWails()) {
         const hasBinding = typeof (window as any).go?.main?.App?.JoinServer === 'function';
-        if (hasBinding) return { status: 'ok', message: 'JoinServer binding ready' };
-        return { status: 'fail', message: 'JoinServer binding not found', action: 'Rebuild the app' };
+        if (hasBinding) return { status: 'ok', message: 'Wails runtime active — all bindings ready' };
+        return { status: 'fail', message: 'Wails bindings missing', action: 'Rebuild the launcher' };
       }
-      try {
-        const r = await fetch('/api/join/__health__', { method: 'POST', signal: AbortSignal.timeout(3000) });
-        if (r.status === 404 || r.status === 400) return { status: 'warn', message: 'Endpoint exists — server not found (expected)' };
-        return { status: 'ok', message: `API responded with HTTP ${r.status}` };
-      } catch {
-        return { status: 'fail', message: 'Join API unreachable', action: 'Make sure dev-api is running' };
-      }
+      return { status: 'warn', message: 'Running in browser (dev mode)', action: 'This is fine for development' };
     },
   },
 ];
@@ -178,7 +167,7 @@ export function HealthCheck() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-slate-200">System Health</h3>
-          <p className="text-xs text-slate-500 mt-0.5">RFC-0042 — verify all systems before Beta</p>
+          <p className="text-xs text-slate-500 mt-0.5">Validates backend, agent, and launcher connectivity</p>
         </div>
         <button
           onClick={runAll}
@@ -207,7 +196,7 @@ export function HealthCheck() {
             : <CheckCircle size={16} />
           }
           {counts.fail === 0 && counts.warn === 0
-            ? 'All checks passed — ready for Beta'
+            ? 'All checks passed — system healthy'
             : `${counts.ok} passed · ${counts.warn} warnings · ${counts.fail} failed`
           }
         </div>
