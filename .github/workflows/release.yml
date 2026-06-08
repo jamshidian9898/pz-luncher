@@ -280,55 +280,38 @@ jobs:
           body: |
             ## PZ Platform ${{ env.VERSION }}
 
-            > ⚠️ This is a **private** repository. Use `gh` CLI to download assets.
-
-            ### Download Assets (Private Repo)
-            ```bash
-            # Install GitHub CLI if needed: https://cli.github.com
-            gh auth login
-            gh release download ${{ env.VERSION }} -R ${{ github.repository }} -p "PATTERN"
-            ```
-
             ### Backend (Linux Server)
             ```bash
             # amd64
-            gh release download ${{ env.VERSION }} -R ${{ github.repository }} -p "pz-backend-linux-amd64"
+            wget https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/pz-backend-linux-amd64
             chmod +x pz-backend-linux-amd64
             ./pz-backend-linux-amd64 -addr :8080 -no-auth
 
             # arm64
-            gh release download ${{ env.VERSION }} -R ${{ github.repository }} -p "pz-backend-linux-arm64"
+            wget https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/pz-backend-linux-arm64
             ```
 
             ### Agent (Linux Server)
             ```bash
-            gh release download ${{ env.VERSION }} -R ${{ github.repository }} -p "pz-agent-linux-amd64"
+            wget https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/pz-agent-linux-amd64
             chmod +x pz-agent-linux-amd64
             ./pz-agent-linux-amd64 -server YOUR_SERVER_ID -backend http://BACKEND_IP:8080 -mods /srv/pz-mods
             ```
 
             ### Agent Auto-Installer
             ```bash
-            gh release download ${{ env.VERSION }} -R ${{ github.repository }} -p "install-agent.sh"
-            PZ_BACKEND=http://BACKEND_IP:8080 PZ_SERVER=my-server sh install-agent.sh
+            curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/install-agent.sh | \
+              PZ_BACKEND=http://BACKEND_IP:8080 PZ_SERVER=my-server sh
             ```
 
             ### Docker
             ```bash
-            # Backend (with auth disabled for dev)
-            docker run -d --name pz-backend -p 8080:8080 \
-              -v pz-data:/data \
-              ${{ secrets.DOCKERHUB_USERNAME }}/pz-backend:${{ env.VERSION }} \
-              -addr :8080 -no-auth
-
-            # Backend (production with auth)
-            docker run -d --name pz-backend -p 8080:8080 \
-              -v pz-data:/data \
-              ${{ secrets.DOCKERHUB_USERNAME }}/pz-backend:${{ env.VERSION }} \
-              -addr :8080
+            # Backend
+            docker run -d -p 8080:8080 -v pz-data:/data \
+              ${{ secrets.DOCKERHUB_USERNAME }}/pz-backend:${{ env.VERSION }}
 
             # Agent
-            docker run -d --name pz-agent \
+            docker run -d \
               -v /srv/pz-mods:/mods \
               ${{ secrets.DOCKERHUB_USERNAME }}/pz-agent:${{ env.VERSION }} \
               -server YOUR_SERVER_ID -backend http://BACKEND_IP:8080 -mods /mods
