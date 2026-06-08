@@ -350,4 +350,4 @@ jobs:
           prerelease: ${{ contains(env.VERSION, 'alpha') || contains(env.VERSION, 'beta') }}
           make_latest: ${{ !contains(env.VERSION, 'alpha') && !contains(env.VERSION, 'beta') }}
           fail_on_unmatched_files: true
-          overwrite: true
+          overwrite_files: true
