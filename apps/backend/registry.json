@@ -1,26 +1,3 @@
 {
-  "servers": [
-    {
-      "id": "server-1",
-      "name": "Example Server",
-      "description": "Offline example with mod-a and mod-b",
-      "gameVersion": "42.8",
-      "playerCount": 12,
-      "maxPlayers": 64,
-      "status": "online",
-      "tags": ["survival"],
-      "manifestPath": "examples/manifest-v1.json"
-    },
-    {
-      "id": "demo-survival",
-      "name": "Demo Survival",
-      "description": "RFC-0030 demo manifest (single mod)",
-      "gameVersion": "42.8",
-      "playerCount": 0,
-      "maxPlayers": 32,
-      "status": "online",
-      "tags": ["survival", "demo"],
-      "manifestPath": "fixtures/manifests/demo-survival.json"
-    }
-  ]
+  "servers": []
 }
