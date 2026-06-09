@@ -28,22 +28,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create pz user
 RUN useradd -ms /bin/bash pzuser
 
-USER pzuser
 WORKDIR /home/pzuser
 
-# Install PZ Dedicated Server via SteamCMD
+# Install PZ Dedicated Server via SteamCMD (run as root — steamcmd needs /root)
 RUN steamcmd +force_install_dir /home/pzuser/pz-server \
     +login anonymous \
     +app_update 380870 validate \
-    +quit
+    +quit \
+    && chown -R pzuser:pzuser /home/pzuser/pz-server
 
 # Copy agent binary
 COPY --from=agent-builder /out/agent /usr/local/bin/pz-agent
 
 # Copy entrypoint
 COPY apps/pz-server/entrypoint.sh /home/pzuser/entrypoint.sh
-
-USER root
 RUN chmod +x /home/pzuser/entrypoint.sh && dos2unix /home/pzuser/entrypoint.sh
 
 USER pzuser
