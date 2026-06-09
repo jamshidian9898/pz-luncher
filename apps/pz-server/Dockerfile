@@ -1,9 +1,9 @@
-# PZ Dedicated Server + Agent — for test environments
-# Uses SteamCMD to install Project Zomboid Dedicated Server (appid 380870)
-# Then runs PZ server + agent side-by-side via entrypoint script.
+# PZ Agent Test Node — simulates a PZ server for local testing
+# Does NOT install the real PZ server (requires Steam login).
+# Instead, creates fake mod content and runs the agent to publish to backend.
 #
 # Build:  docker build -t pz-server -f apps/pz-server/Dockerfile .
-# Run:    docker run -d -p 16261:16261/udp -p 16262:16262 \
+# Run:    docker run -d \
 #           -e PZ_BACKEND=http://backend:8080 \
 #           -e PZ_SERVER_NAME=test-server-1 \
 #           pz-server
@@ -16,46 +16,28 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/agent ./apps/pz-agent/cmd/agent
 
 # ── Runtime ──
-FROM steamcmd/steamcmd:ubuntu-24
+FROM alpine:3.20
 
-USER root
-
-# Required packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl procps jq dos2unix \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create pz user
-RUN useradd -ms /bin/bash pzuser
-
-WORKDIR /home/pzuser
-
-# Install PZ Dedicated Server via SteamCMD (run as root — steamcmd needs /root)
-RUN steamcmd +force_install_dir /home/pzuser/pz-server \
-    +login anonymous \
-    +app_update 380870 validate \
-    +quit \
-    && chown -R pzuser:pzuser /home/pzuser/pz-server
+RUN apk add --no-cache ca-certificates bash && \
+    addgroup -S pz && adduser -S pz -G pz -s /bin/bash
 
 # Copy agent binary
 COPY --from=agent-builder /out/agent /usr/local/bin/pz-agent
 
 # Copy entrypoint
-COPY apps/pz-server/entrypoint.sh /home/pzuser/entrypoint.sh
-RUN chmod +x /home/pzuser/entrypoint.sh && dos2unix /home/pzuser/entrypoint.sh
+COPY apps/pz-server/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-USER pzuser
+RUN mkdir -p /mods && chown pz:pz /mods
 
-# PZ Server ports: 16261 UDP (game), 16262 TCP (RCON/direct)
-EXPOSE 16261/udp 16262
+USER pz
 
 # Environment defaults
 ENV PZ_BACKEND=http://backend:8080 \
     PZ_SERVER_NAME=pz-test \
-    PZ_SERVER_MEMORY=2048m \
-    PZ_ADMIN_PASSWORD=admin \
-    PZ_AGENT_INTERVAL=60s
+    PZ_AGENT_INTERVAL=30s \
+    PZ_MOD_COUNT=5
 
-VOLUME ["/home/pzuser/Zomboid"]
+VOLUME ["/mods"]
 
-ENTRYPOINT ["/home/pzuser/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]
