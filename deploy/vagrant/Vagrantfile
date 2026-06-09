@@ -1,0 +1,80 @@
+# PZ Platform — Vagrant Test Environment
+#
+# Requires:
+#   - Vagrant           https://www.vagrantup.com/downloads
+#   - VMware Workstation + vagrant-vmware-desktop plugin
+#     OR VirtualBox (free alternative)
+#
+# Install VMware plugin:
+#   vagrant plugin install vagrant-vmware-desktop
+#
+# Usage:
+#   cd deploy/vagrant
+#   vagrant up                  # boot both VMs + provision
+#   vagrant provision           # re-run Ansible
+#   vagrant ssh pz-srv-1        # SSH into VM 1
+#   vagrant halt                # stop VMs
+#   vagrant destroy -f          # delete VMs
+#
+# After boot:
+#   pz-srv-1  →  192.168.56.11  (PZ Server port 16261)
+#   pz-srv-2  →  192.168.56.12  (PZ Server port 16261)
+#   Backend   →  http://192.168.56.1:8080  (Docker on host)
+
+BACKEND_URL = ENV.fetch("PZ_BACKEND_URL", "http://192.168.56.1:8080")
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/jammy64"
+
+  # ── VMware provider settings ──
+  config.vm.provider "vmware_desktop" do |v|
+    v.memory = 4096
+    v.cpus   = 2
+    v.linked_clone = true
+  end
+
+  # ── VirtualBox fallback ──
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 4096
+    v.cpus   = 2
+    v.linked_clone = true
+  end
+
+  # ── PZ Server 1 ──
+  config.vm.define "pz-srv-1" do |srv|
+    srv.vm.hostname = "pz-srv-1"
+    srv.vm.network "private_network", ip: "192.168.56.11"
+    srv.vm.network "forwarded_port", guest: 16261, host: 16261, protocol: "udp"
+    srv.vm.network "forwarded_port", guest: 16262, host: 16262
+
+    srv.vm.provision "ansible_local" do |ansible|
+      ansible.playbook       = "ansible/playbook.yml"
+      ansible.inventory_path = "ansible/inventory.ini"
+      ansible.limit          = "pz-srv-1"
+      ansible.extra_vars     = {
+        pz_server_name: "pz-srv-1",
+        pz_backend_url: BACKEND_URL,
+        pz_agent_interval: "60s",
+      }
+    end
+  end
+
+  # ── PZ Server 2 ──
+  config.vm.define "pz-srv-2" do |srv|
+    srv.vm.hostname = "pz-srv-2"
+    srv.vm.network "private_network", ip: "192.168.56.12"
+    srv.vm.network "forwarded_port", guest: 16261, host: 16263, protocol: "udp"
+    srv.vm.network "forwarded_port", guest: 16262, host: 16264
+
+    srv.vm.provision "ansible_local" do |ansible|
+      ansible.playbook       = "ansible/playbook.yml"
+      ansible.inventory_path = "ansible/inventory.ini"
+      ansible.limit          = "pz-srv-2"
+      ansible.extra_vars     = {
+        pz_server_name: "pz-srv-2",
+        pz_backend_url: BACKEND_URL,
+        pz_agent_interval: "60s",
+      }
+    end
+  end
+end

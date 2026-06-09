@@ -1,7 +1,8 @@
 .PHONY: contracts test join demo dev-api backend agent ui-dev build-ui \
         build-mac build-mac-intel build-windows build-linux build-all \
         release-backend release-agent release docker-backend docker-agent docker-all \
-        test-stack test-stack-down test-stack-logs test-stack-status
+        test-stack test-stack-down test-stack-logs test-stack-status \
+        vm-up vm-down vm-provision vm-status
 
 APP_DIR   = apps/launcher-ui
 DIST_DIR  = dist
@@ -137,6 +138,33 @@ test-stack-status:
 	@docker compose -f docker-compose.test.yml ps
 	@echo ""
 	@echo "=== Backend Servers ==="
+	@curl -s http://localhost:8080/api/v1/servers | python3 -m json.tool 2>/dev/null || echo "(backend not ready)"
+	@echo ""
+	@echo "=== Agent Status ==="
+	@curl -s http://localhost:8080/api/v1/agents | python3 -m json.tool 2>/dev/null || echo "(backend not ready)"
+
+# --- VM Test Environment (Vagrant + VMware/VirtualBox) ---
+# Requires: vagrant, vagrant-vmware-desktop plugin (or VirtualBox)
+
+vm-up:
+	@echo "=== Starting PZ VM Test Environment ==="
+	@echo "VM 1: pz-srv-1  →  192.168.56.11  (PZ port 16261)"
+	@echo "VM 2: pz-srv-2  →  192.168.56.12  (PZ port 16261)"
+	@echo "Backend on host must be running: make test-stack"
+	@echo ""
+	cd deploy/vagrant && vagrant up
+
+vm-down:
+	cd deploy/vagrant && vagrant halt
+
+vm-provision:
+	cd deploy/vagrant && vagrant provision
+
+vm-status:
+	@echo "=== VM Status ==="
+	cd deploy/vagrant && vagrant status
+	@echo ""
+	@echo "=== Registered Servers ==="
 	@curl -s http://localhost:8080/api/v1/servers | python3 -m json.tool 2>/dev/null || echo "(backend not ready)"
 	@echo ""
 	@echo "=== Agent Status ==="

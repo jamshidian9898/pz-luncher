@@ -1,0 +1,231 @@
+---
+# PZ Platform — Ansible Playbook
+# Installs:
+#   1. SteamCMD + PZ Dedicated Server
+#   2. PZ Agent (from GitHub release)
+#   3. systemd services for both
+
+- name: Provision PZ Server Node
+  hosts: all
+  become: true
+
+  vars:
+    pz_server_name: "pz-server"
+    pz_backend_url: "http://192.168.56.1:8080"
+    pz_agent_interval: "60s"
+    pz_user: pzserver
+    pz_home: /home/pzserver
+    pz_install_dir: /home/pzserver/pz-server
+    pz_data_dir: /home/pzserver/Zomboid
+    pz_mods_dir: /home/pzserver/Zomboid/mods
+    agent_version: "latest"
+    agent_bin: /usr/local/bin/pz-agent
+
+  tasks:
+
+    # ── System packages ──
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - wget
+          - lib32gcc-s1
+          - steamcmd
+          - openjdk-17-jre-headless
+        state: present
+        update_cache: true
+
+    # ── PZ user ──
+    - name: Create pzserver user
+      user:
+        name: "{{ pz_user }}"
+        shell: /bin/bash
+        home: "{{ pz_home }}"
+        create_home: true
+        system: false
+
+    - name: Create required directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ pz_user }}"
+        group: "{{ pz_user }}"
+        mode: "0755"
+      loop:
+        - "{{ pz_install_dir }}"
+        - "{{ pz_data_dir }}"
+        - "{{ pz_mods_dir }}"
+        - "{{ pz_data_dir }}/Server"
+
+    # ── PZ Dedicated Server via SteamCMD ──
+    - name: Install PZ Dedicated Server (steamcmd — requires Steam account for app 380870)
+      become_user: "{{ pz_user }}"
+      command: >
+        /usr/games/steamcmd
+        +force_install_dir {{ pz_install_dir }}
+        +login anonymous
+        +app_update 380870 validate
+        +quit
+      args:
+        creates: "{{ pz_install_dir }}/ProjectZomboid64.json"
+      register: steamcmd_result
+      ignore_errors: true
+
+    - name: Warn if PZ install failed (Steam login required)
+      debug:
+        msg: >
+          WARNING: PZ Dedicated Server install failed.
+          App 380870 requires Steam login.
+          Run manually: steamcmd +login <user> +app_update 380870 +quit
+          Agent will still run and can use mods from {{ pz_mods_dir }}
+      when: steamcmd_result is failed
+
+    # ── PZ Server config ──
+    - name: Create PZ server config
+      become_user: "{{ pz_user }}"
+      copy:
+        dest: "{{ pz_data_dir }}/Server/{{ pz_server_name }}.ini"
+        content: |
+          DefaultPort=16261
+          MaxPlayers=16
+          PVP=true
+          PauseEmpty=true
+          Open=true
+          ServerName={{ pz_server_name }}
+          Password=
+          AdminPassword=admin
+          PublicName={{ pz_server_name }}
+          PublicDescription=PZ Test Server managed by pz-launcher
+          Map=Muldraugh, KY
+        force: false
+
+    # ── PZ Agent ──
+    - name: Get latest agent release URL
+      uri:
+        url: "https://api.github.com/repos/jamshidian9898/pz-luncher/releases/latest"
+        return_content: true
+      register: release_info
+      ignore_errors: true
+
+    - name: Download pz-agent binary (from GitHub release)
+      get_url:
+        url: "{{ release_info.json.assets | selectattr('name', 'match', 'pz-agent-linux-amd64') | map(attribute='browser_download_url') | first }}"
+        dest: "{{ agent_bin }}"
+        mode: "0755"
+      when: release_info is succeeded and release_info.json.assets is defined
+      ignore_errors: true
+
+    - name: Fallback — build agent from source if binary unavailable
+      block:
+        - name: Install Go
+          apt:
+            name: golang-go
+            state: present
+
+        - name: Clone repo
+          git:
+            repo: "https://github.com/jamshidian9898/pz-luncher.git"
+            dest: /tmp/pz-luncher
+            version: main
+            depth: 1
+          ignore_errors: true
+
+        - name: Build agent
+          command: go build -o {{ agent_bin }} ./apps/pz-agent/cmd/agent
+          args:
+            chdir: /tmp/pz-luncher
+          environment:
+            CGO_ENABLED: "0"
+            GOOS: linux
+      when: not (agent_bin | string) or (release_info is failed)
+      ignore_errors: true
+
+    # ── systemd: PZ Agent ──
+    - name: Create pz-agent systemd service
+      copy:
+        dest: /etc/systemd/system/pz-agent.service
+        content: |
+          [Unit]
+          Description=PZ Launcher Agent
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User={{ pz_user }}
+          EnvironmentFile=-/etc/pz-agent.env
+          ExecStart={{ agent_bin }} \
+            -server {{ pz_server_name }} \
+            -backend {{ pz_backend_url }} \
+            -mods {{ pz_mods_dir }} \
+            -interval {{ pz_agent_interval }}
+          Restart=on-failure
+          RestartSec=15s
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=pz-agent
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Create agent env file
+      copy:
+        dest: /etc/pz-agent.env
+        content: |
+          # PZ Agent environment
+          # PZ_AGENT_TOKEN=<token>  # auto-registered if empty
+        mode: "0600"
+        force: false
+
+    - name: Enable and start pz-agent
+      systemd:
+        name: pz-agent
+        daemon_reload: true
+        enabled: true
+        state: started
+
+    # ── systemd: PZ Server (only if installed) ──
+    - name: Create pz-server systemd service
+      copy:
+        dest: /etc/systemd/system/pz-server.service
+        content: |
+          [Unit]
+          Description=Project Zomboid Dedicated Server
+          After=network-online.target pz-agent.service
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User={{ pz_user }}
+          WorkingDirectory={{ pz_install_dir }}
+          ExecStart=/bin/bash {{ pz_install_dir }}/start-server.sh \
+            -servername {{ pz_server_name }} \
+            -Xmx2048m -Xms512m
+          Restart=on-failure
+          RestartSec=30s
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=pz-server
+
+          [Install]
+          WantedBy=multi-user.target
+      when: steamcmd_result is succeeded
+
+    - name: Enable pz-server (if installed)
+      systemd:
+        name: pz-server
+        daemon_reload: true
+        enabled: true
+        state: started
+      when: steamcmd_result is succeeded
+      ignore_errors: true
+
+    # ── Status ──
+    - name: Show agent status
+      command: systemctl status pz-agent --no-pager -l
+      register: agent_status
+      ignore_errors: true
+
+    - name: Print agent status
+      debug:
+        msg: "{{ agent_status.stdout_lines }}"
