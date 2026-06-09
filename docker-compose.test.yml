@@ -59,7 +59,7 @@ services:
       PZ_BACKEND: http://backend:8080
       PZ_SERVER_NAME: pz-test-1
       PZ_SERVER_MEMORY: 1024m
-      PZ_ADMIN_PASSWORD: test123
+      PZ_ADMIN_PASSWORD: ${PZ_SRV1_ADMIN_PASSWORD:-changeme}
       PZ_AGENT_INTERVAL: 30s
     volumes:
       - pz-srv1-data:/home/pzuser/Zomboid
@@ -83,7 +83,7 @@ services:
       PZ_BACKEND: http://backend:8080
       PZ_SERVER_NAME: pz-test-2
       PZ_SERVER_MEMORY: 1024m
-      PZ_ADMIN_PASSWORD: test456
+      PZ_ADMIN_PASSWORD: ${PZ_SRV2_ADMIN_PASSWORD:-changeme}
       PZ_AGENT_INTERVAL: 30s
     volumes:
       - pz-srv2-data:/home/pzuser/Zomboid
@@ -152,7 +152,7 @@ services:
       - grafana-data:/var/lib/grafana
       - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-changeme}
       GF_USERS_ALLOW_SIGN_UP: "false"
     depends_on:
       - prometheus
