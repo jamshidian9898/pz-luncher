@@ -2,6 +2,8 @@
         build-mac build-mac-intel build-windows build-linux build-all \
         release-backend release-agent release docker-backend docker-agent docker-all \
         test-stack test-stack-down test-stack-logs test-stack-status \
+        test-stack-full test-stack-full-down \
+        fake-agents-up fake-agents-down fake-agents-logs \
         vm-up vm-down vm-provision vm-status
 
 APP_DIR   = apps/launcher-ui
@@ -116,15 +118,36 @@ docker-all: docker-backend docker-agent
 # --- Test Stack (full local environment) ---
 
 test-stack:
-	@echo "=== Starting PZ Test Stack ==="
+	@echo "=== Starting PZ Test Stack (backend + monitoring) ==="
 	@echo "Backend:    http://localhost:8080"
-	@echo "Grafana:    http://localhost:3000  (admin/admin)"
+	@echo "Grafana:    http://localhost:3000  (admin/changeme)"
 	@echo "Prometheus: http://localhost:9090"
 	@echo "Loki:       http://localhost:3100"
 	@echo ""
 	docker compose -f docker-compose.test.yml up --build -d
 	@echo ""
-	@echo "✓ Stack is up. Run 'make test-stack-logs' to follow logs."
+	@echo "✓ Backend + monitoring up."
+	@echo "  → Run 'make fake-agents-up' to add fake test agents."
+	@echo "  → Run 'make test-stack-full' for everything at once."
+
+test-stack-full:
+	@echo "=== Starting Full Test Stack (backend + monitoring + fake agents) ==="
+	@echo "Backend:    http://localhost:8080"
+	@echo "Grafana:    http://localhost:3000  (admin/changeme)"
+	@echo "Prometheus: http://localhost:9090"
+	@echo "Loki:       http://localhost:3100"
+	@echo "Agent 1:    pz-test-1 (5 fake mods)"
+	@echo "Agent 2:    pz-test-2 (3 fake mods)"
+	@echo ""
+	docker compose -f docker-compose.test.yml up --build -d
+	docker compose -f docker-compose.fake-agents.yml up --build -d
+	@echo ""
+	@echo "✓ Full stack up. Run 'make test-stack-status' to verify."
+
+test-stack-full-down:
+	docker compose -f docker-compose.fake-agents.yml down -v
+	docker compose -f docker-compose.test.yml down -v
+	@echo "✓ Full stack stopped and volumes removed."
 
 test-stack-down:
 	docker compose -f docker-compose.test.yml down -v
@@ -132,6 +155,18 @@ test-stack-down:
 
 test-stack-logs:
 	docker compose -f docker-compose.test.yml logs -f --tail=50
+
+fake-agents-up:
+	@echo "=== Starting Fake Agent Nodes ==="
+	docker compose -f docker-compose.fake-agents.yml up --build -d
+	@echo "✓ Fake agents up — check 'make test-stack-status' in ~30s."
+
+fake-agents-down:
+	docker compose -f docker-compose.fake-agents.yml down -v
+	@echo "✓ Fake agents stopped."
+
+fake-agents-logs:
+	docker compose -f docker-compose.fake-agents.yml logs -f --tail=50
 
 test-stack-status:
 	@echo "=== Container Status ==="

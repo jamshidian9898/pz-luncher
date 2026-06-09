@@ -1,0 +1,68 @@
+# PZ Platform — Fake Agent Nodes (for testing without real PZ server)
+#
+# Spins up 2 lightweight containers, each running pz-agent with generated
+# fake mods. Agents auto-register with the backend and push mods every 30s.
+#
+# Requires: docker-compose.test.yml to be up first (backend must be healthy)
+#
+# Usage:
+#   make test-stack-full          # backend + monitoring + fake agents
+#   make fake-agents-up           # fake agents only (backend must already be up)
+#   make fake-agents-down         # stop fake agents
+#   make fake-agents-logs         # follow logs
+
+services:
+
+  # ── Fake Agent 1 — registers as "pz-test-1", generates 5 fake mods ──
+  fake-agent-1:
+    build:
+      context: .
+      dockerfile: apps/pz-server/Dockerfile
+    image: pz-agent-node:test
+    container_name: pz-fake-agent-1
+    restart: unless-stopped
+    environment:
+      PZ_BACKEND: http://backend:8080
+      PZ_SERVER_NAME: pz-test-1
+      PZ_AGENT_INTERVAL: 30s
+      PZ_MOD_COUNT: 5
+    volumes:
+      - fake-agent-1-mods:/mods
+    depends_on:
+      backend:
+        condition: service_healthy
+    labels:
+      - "logging=promtail"
+    networks:
+      - pz-net
+
+  # ── Fake Agent 2 — registers as "pz-test-2", generates 3 fake mods ──
+  fake-agent-2:
+    build:
+      context: .
+      dockerfile: apps/pz-server/Dockerfile
+    image: pz-agent-node:test
+    container_name: pz-fake-agent-2
+    restart: unless-stopped
+    environment:
+      PZ_BACKEND: http://backend:8080
+      PZ_SERVER_NAME: pz-test-2
+      PZ_AGENT_INTERVAL: 30s
+      PZ_MOD_COUNT: 3
+    volumes:
+      - fake-agent-2-mods:/mods
+    depends_on:
+      backend:
+        condition: service_healthy
+    labels:
+      - "logging=promtail"
+    networks:
+      - pz-net
+
+volumes:
+  fake-agent-1-mods:
+  fake-agent-2-mods:
+
+networks:
+  pz-net:
+    external: true

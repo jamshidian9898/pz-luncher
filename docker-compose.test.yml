@@ -1,18 +1,17 @@
-# PZ Platform — Full Test Stack
+# PZ Platform — Backend + Monitoring Stack
 #
-# Brings up everything needed for local testing:
-#   - Backend          → http://localhost:8080
-#   - PZ Server 1      → agent auto-registers as "pz-test-1"
-#   - PZ Server 2      → agent auto-registers as "pz-test-2"
-#   - Prometheus        → http://localhost:9090
-#   - Grafana           → http://localhost:3000 (admin/admin)
-#   - Loki              → http://localhost:3100
-#   - Promtail          → ships container logs to Loki
+# Services:
+#   backend    → http://localhost:8080
+#   prometheus → http://localhost:9090
+#   grafana    → http://localhost:3000 (admin/changeme)
+#   loki       → http://localhost:3100
+#   promtail   → ships container logs to Loki
 #
-# Usage:
-#   docker compose -f docker-compose.test.yml up --build -d
-#   docker compose -f docker-compose.test.yml logs -f
-#   docker compose -f docker-compose.test.yml down -v
+# Usage (backend only):
+#   make test-stack
+#
+# Usage (backend + fake agents):
+#   make test-stack-full
 #
 # Launcher runs native on host → connect to http://localhost:8080
 
@@ -42,54 +41,6 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
-    labels:
-      - "logging=promtail"
-    networks:
-      - pz-net
-
-  # ── PZ Server 1 (with embedded agent) ──
-  pz-server-1:
-    build:
-      context: .
-      dockerfile: apps/pz-server/Dockerfile
-    image: pz-server:test
-    container_name: pz-server-1
-    restart: unless-stopped
-    environment:
-      PZ_BACKEND: http://backend:8080
-      PZ_SERVER_NAME: pz-test-1
-      PZ_SERVER_MEMORY: 1024m
-      PZ_ADMIN_PASSWORD: ${PZ_SRV1_ADMIN_PASSWORD:-changeme}
-      PZ_AGENT_INTERVAL: 30s
-    volumes:
-      - pz-srv1-data:/home/pzuser/Zomboid
-    depends_on:
-      backend:
-        condition: service_healthy
-    labels:
-      - "logging=promtail"
-    networks:
-      - pz-net
-
-  # ── PZ Server 2 (with embedded agent) ──
-  pz-server-2:
-    build:
-      context: .
-      dockerfile: apps/pz-server/Dockerfile
-    image: pz-server:test
-    container_name: pz-server-2
-    restart: unless-stopped
-    environment:
-      PZ_BACKEND: http://backend:8080
-      PZ_SERVER_NAME: pz-test-2
-      PZ_SERVER_MEMORY: 1024m
-      PZ_ADMIN_PASSWORD: ${PZ_SRV2_ADMIN_PASSWORD:-changeme}
-      PZ_AGENT_INTERVAL: 30s
-    volumes:
-      - pz-srv2-data:/home/pzuser/Zomboid
-    depends_on:
-      backend:
-        condition: service_healthy
     labels:
       - "logging=promtail"
     networks:
@@ -162,8 +113,6 @@ services:
 
 volumes:
   backend-data:
-  pz-srv1-data:
-  pz-srv2-data:
   prometheus-data:
   loki-data:
   grafana-data:
