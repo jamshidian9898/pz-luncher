@@ -2,13 +2,18 @@ import { LauncherApi } from '../interfaces/LauncherApi';
 import { ServerInfo, ServerDetails, SessionStatus } from '../types';
 import { launcherEventBus } from './eventBus';
 import { sseEventsApi } from './SseEventsApi';
+import { useSettingsStore } from '../stores/settings.store';
 
 const DEV_API_BASE = '/api';
 
 function getBackendBase(): string {
+  // 1. Explicit window override (set by Wails or dev harness)
   if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).__BACKEND_URL__) {
-    return (window as unknown as Record<string, string>).__BACKEND_URL__;
+    return ((window as unknown as Record<string, string>).__BACKEND_URL__).replace(/\/$/, '');
   }
+  // 2. User-configured backend URL from settings store
+  const url = useSettingsStore.getState().settings?.backendUrl;
+  if (url && url.trim()) return url.trim().replace(/\/$/, '');
   return 'http://localhost:8080';
 }
 

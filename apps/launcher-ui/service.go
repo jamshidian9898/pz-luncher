@@ -310,10 +310,7 @@ func (s *UIService) backendPost(url string, out interface{}) error {
 }
 
 func (s *UIService) fallbackServerList() []ServerInfo {
-	return []ServerInfo{{
-		ID: "demo-survival", Name: "Demo Survival", Description: "Backend unreachable — offline demo",
-		PlayerCount: 0, MaxPlayers: 32,
-	}}
+	return []ServerInfo{}
 }
 
 // GetSessionStatus returns tracked session progress

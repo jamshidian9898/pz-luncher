@@ -130,11 +130,17 @@ const CHECKS: Check[] = [
 
 /* ── Component ── */
 export function HealthCheck() {
-  const settings = useSettingsStore(s => s.settings);
+  const { settings, fetchSettings } = useSettingsStore(s => ({ settings: s.settings, fetchSettings: s.fetchSettings }));
   const [states, setStates] = useState<Record<string, CheckState>>({});
   const [running, setRunning] = useState(false);
 
+  const resolvedBackend = getBackendUrl(settings);
+
   async function runAll() {
+    // Ensure settings are loaded before running checks
+    if (!settings) await fetchSettings();
+    const currentSettings = useSettingsStore.getState().settings;
+
     setRunning(true);
     const initial: Record<string, CheckState> = {};
     for (const c of CHECKS) initial[c.id] = { status: 'running', result: null };
@@ -142,7 +148,7 @@ export function HealthCheck() {
 
     for (const check of CHECKS) {
       try {
-        const result = await check.run(settings);
+        const result = await check.run(currentSettings);
         setStates(prev => ({ ...prev, [check.id]: { status: result.status, result } }));
       } catch {
         setStates(prev => ({
@@ -167,7 +173,9 @@ export function HealthCheck() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-slate-200">System Health</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Validates backend, agent, and launcher connectivity</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Target: <span className="text-emerald-400 font-mono">{resolvedBackend}</span>
+          </p>
         </div>
         <button
           onClick={runAll}
