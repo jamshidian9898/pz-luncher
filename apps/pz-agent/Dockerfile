@@ -23,13 +23,9 @@ RUN mkdir -p /mods && chown pz:pz /mods
 
 USER pz
 
-# Required env:
-#   PZ_AGENT_SERVER  — serverId registered in the Backend
-#   PZ_AGENT_BACKEND — e.g. http://backend:8080
-#   PZ_AGENT_TOKEN   — pre-issued token (leave empty for auto-register)
-#   PZ_AGENT_MODS    — path to mod directory (default /mods)
+# Environment:
+#   PZ_AGENT_TOKEN — pre-issued token (leave empty for auto-register)
+# All flags are optional — agent auto-detects server name and mods dir.
 
 ENTRYPOINT ["/app/agent"]
-CMD ["-server", "${PZ_AGENT_SERVER}", \
-     "-backend", "${PZ_AGENT_BACKEND}", \
-     "-mods", "/mods"]
+CMD ["-backend", "http://localhost:8080", "-mods", "/mods"]

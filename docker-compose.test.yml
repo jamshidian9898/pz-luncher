@@ -1,0 +1,173 @@
+# PZ Platform — Full Test Stack
+#
+# Brings up everything needed for local testing:
+#   - Backend          → http://localhost:8080
+#   - PZ Server 1      → agent auto-registers as "pz-test-1"
+#   - PZ Server 2      → agent auto-registers as "pz-test-2"
+#   - Prometheus        → http://localhost:9090
+#   - Grafana           → http://localhost:3000 (admin/admin)
+#   - Loki              → http://localhost:3100
+#   - Promtail          → ships container logs to Loki
+#
+# Usage:
+#   docker compose -f docker-compose.test.yml up --build -d
+#   docker compose -f docker-compose.test.yml logs -f
+#   docker compose -f docker-compose.test.yml down -v
+#
+# Launcher runs native on host → connect to http://localhost:8080
+
+services:
+
+  # ── Backend ──
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    image: pz-backend:test
+    container_name: pz-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - backend-data:/data
+    command:
+      - -addr=:8080
+      - -registry=/app/registry.json
+      - -store=/data/store
+      - -fixtures=/app/fixtures
+      - -no-auth
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/servers"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    labels:
+      - "logging=promtail"
+    networks:
+      - pz-net
+
+  # ── PZ Server 1 (with embedded agent) ──
+  pz-server-1:
+    build:
+      context: .
+      dockerfile: apps/pz-server/Dockerfile
+    image: pz-server:test
+    container_name: pz-server-1
+    restart: unless-stopped
+    environment:
+      PZ_BACKEND: http://backend:8080
+      PZ_SERVER_NAME: pz-test-1
+      PZ_SERVER_MEMORY: 1024m
+      PZ_ADMIN_PASSWORD: test123
+      PZ_AGENT_INTERVAL: 30s
+    volumes:
+      - pz-srv1-data:/home/pzuser/Zomboid
+    depends_on:
+      backend:
+        condition: service_healthy
+    labels:
+      - "logging=promtail"
+    networks:
+      - pz-net
+
+  # ── PZ Server 2 (with embedded agent) ──
+  pz-server-2:
+    build:
+      context: .
+      dockerfile: apps/pz-server/Dockerfile
+    image: pz-server:test
+    container_name: pz-server-2
+    restart: unless-stopped
+    environment:
+      PZ_BACKEND: http://backend:8080
+      PZ_SERVER_NAME: pz-test-2
+      PZ_SERVER_MEMORY: 1024m
+      PZ_ADMIN_PASSWORD: test456
+      PZ_AGENT_INTERVAL: 30s
+    volumes:
+      - pz-srv2-data:/home/pzuser/Zomboid
+    depends_on:
+      backend:
+        condition: service_healthy
+    labels:
+      - "logging=promtail"
+    networks:
+      - pz-net
+
+  # ── Prometheus ──
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: pz-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+    networks:
+      - pz-net
+
+  # ── Loki (log aggregation) ──
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: pz-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./deploy/loki/loki-config.yml:/etc/loki/config.yml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/config.yml
+    networks:
+      - pz-net
+
+  # ── Promtail (ships Docker logs → Loki) ──
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: pz-promtail
+    restart: unless-stopped
+    volumes:
+      - ./deploy/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - pz-net
+
+  # ── Grafana (dashboards + logs) ──
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: pz-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - pz-net
+
+volumes:
+  backend-data:
+  pz-srv1-data:
+  pz-srv2-data:
+  prometheus-data:
+  loki-data:
+  grafana-data:
+
+networks:
+  pz-net:
+    driver: bridge

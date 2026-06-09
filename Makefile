@@ -1,6 +1,7 @@
 .PHONY: contracts test join demo dev-api backend agent ui-dev build-ui \
         build-mac build-mac-intel build-windows build-linux build-all \
-        release-backend release-agent release docker-backend docker-agent docker-all
+        release-backend release-agent release docker-backend docker-agent docker-all \
+        test-stack test-stack-down test-stack-logs test-stack-status
 
 APP_DIR   = apps/launcher-ui
 DIST_DIR  = dist
@@ -110,3 +111,33 @@ docker-agent:
 
 docker-all: docker-backend docker-agent
 	@echo "✓ All Docker images built."
+
+# --- Test Stack (full local environment) ---
+
+test-stack:
+	@echo "=== Starting PZ Test Stack ==="
+	@echo "Backend:    http://localhost:8080"
+	@echo "Grafana:    http://localhost:3000  (admin/admin)"
+	@echo "Prometheus: http://localhost:9090"
+	@echo "Loki:       http://localhost:3100"
+	@echo ""
+	docker compose -f docker-compose.test.yml up --build -d
+	@echo ""
+	@echo "✓ Stack is up. Run 'make test-stack-logs' to follow logs."
+
+test-stack-down:
+	docker compose -f docker-compose.test.yml down -v
+	@echo "✓ Stack stopped and volumes removed."
+
+test-stack-logs:
+	docker compose -f docker-compose.test.yml logs -f --tail=50
+
+test-stack-status:
+	@echo "=== Container Status ==="
+	@docker compose -f docker-compose.test.yml ps
+	@echo ""
+	@echo "=== Backend Servers ==="
+	@curl -s http://localhost:8080/api/v1/servers | python3 -m json.tool 2>/dev/null || echo "(backend not ready)"
+	@echo ""
+	@echo "=== Agent Status ==="
+	@curl -s http://localhost:8080/api/v1/agents | python3 -m json.tool 2>/dev/null || echo "(backend not ready)"
