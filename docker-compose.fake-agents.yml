@@ -20,17 +20,14 @@ services:
       dockerfile: apps/pz-server/Dockerfile
     image: pz-agent-node:test
     container_name: pz-fake-agent-1
-    restart: unless-stopped
+    restart: on-failure
     environment:
-      PZ_BACKEND: http://backend:8080
+      PZ_BACKEND: http://pz-backend:8080
       PZ_SERVER_NAME: pz-test-1
       PZ_AGENT_INTERVAL: 30s
       PZ_MOD_COUNT: 5
     volumes:
       - fake-agent-1-mods:/mods
-    depends_on:
-      backend:
-        condition: service_healthy
     labels:
       - "logging=promtail"
     networks:
@@ -43,17 +40,14 @@ services:
       dockerfile: apps/pz-server/Dockerfile
     image: pz-agent-node:test
     container_name: pz-fake-agent-2
-    restart: unless-stopped
+    restart: on-failure
     environment:
-      PZ_BACKEND: http://backend:8080
+      PZ_BACKEND: http://pz-backend:8080
       PZ_SERVER_NAME: pz-test-2
       PZ_AGENT_INTERVAL: 30s
       PZ_MOD_COUNT: 3
     volumes:
       - fake-agent-2-mods:/mods
-    depends_on:
-      backend:
-        condition: service_healthy
     labels:
       - "logging=promtail"
     networks:

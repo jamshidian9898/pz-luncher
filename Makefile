@@ -140,6 +140,8 @@ test-stack-full:
 	@echo "Agent 2:    pz-test-2 (3 fake mods)"
 	@echo ""
 	docker compose -f docker-compose.test.yml up --build -d
+	@echo "Waiting for backend to be healthy..."
+	@until docker inspect pz-backend --format='{{.State.Health.Status}}' 2>/dev/null | grep -q healthy; do sleep 2; done
 	docker compose -f docker-compose.fake-agents.yml up --build -d
 	@echo ""
 	@echo "✓ Full stack up. Run 'make test-stack-status' to verify."
