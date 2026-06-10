@@ -119,4 +119,5 @@ volumes:
 
 networks:
   pz-net:
+    name: pz-net
     driver: bridge
