@@ -332,6 +332,82 @@ func (s *UIService) RepairCache() error {
 	return nil
 }
 
+// HealthStatus holds result of a single health check
+type HealthStatus struct {
+	BackendURL string `json:"backendUrl"`
+	Backend    string `json:"backend"` // "ok" | "fail"
+	BackendMsg string `json:"backendMsg"`
+	Agents     string `json:"agents"` // "ok" | "warn" | "fail"
+	AgentsMsg  string `json:"agentsMsg"`
+	Servers    string `json:"servers"` // "ok" | "warn" | "fail"
+	ServersMsg string `json:"serversMsg"`
+}
+
+// CheckBackend runs health checks from Go side (avoids WebView fetch issues)
+func (s *UIService) CheckBackend() HealthStatus {
+	base := s.backendURL()
+	result := HealthStatus{BackendURL: base}
+
+	// 1. Backend reachable
+	type serversResp struct {
+		Servers []struct {
+			ID string `json:"id"`
+		} `json:"servers"`
+	}
+	var srvResp serversResp
+	if err := s.backendGet(base+"/api/v1/servers", &srvResp); err != nil {
+		result.Backend = "fail"
+		result.BackendMsg = fmt.Sprintf("Cannot reach %s — %v", base, err)
+		result.Agents = "fail"
+		result.AgentsMsg = "Backend unreachable"
+		result.Servers = "fail"
+		result.ServersMsg = "Backend unreachable"
+		return result
+	}
+	result.Backend = "ok"
+	result.BackendMsg = fmt.Sprintf("Connected to %s", base)
+
+	// 2. Servers
+	count := len(srvResp.Servers)
+	if count == 0 {
+		result.Servers = "warn"
+		result.ServersMsg = "No servers registered yet — start fake-agents or real agent"
+	} else {
+		result.Servers = "ok"
+		result.ServersMsg = fmt.Sprintf("%d server(s) registered", count)
+	}
+
+	// 3. Agents
+	type agentsResp struct {
+		Agents []struct {
+			Status string `json:"status"`
+		} `json:"agents"`
+	}
+	var agResp agentsResp
+	if err := s.backendGet(base+"/api/v1/agents", &agResp); err != nil {
+		result.Agents = "warn"
+		result.AgentsMsg = "Agent endpoint unavailable"
+		return result
+	}
+	online := 0
+	for _, a := range agResp.Agents {
+		if a.Status == "online" {
+			online++
+		}
+	}
+	if online == 0 && len(agResp.Agents) == 0 {
+		result.Agents = "warn"
+		result.AgentsMsg = "No agents registered"
+	} else if online == 0 {
+		result.Agents = "warn"
+		result.AgentsMsg = fmt.Sprintf("%d agent(s) registered but none online", len(agResp.Agents))
+	} else {
+		result.Agents = "ok"
+		result.AgentsMsg = fmt.Sprintf("%d agent(s) online", online)
+	}
+	return result
+}
+
 // GetSettings returns launcher settings (RFC-0036)
 func (s *UIService) GetSettings() (*Settings, error) {
 	st, err := settings.Load(s.getWorkspaceRoot())

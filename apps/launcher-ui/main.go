@@ -81,6 +81,11 @@ func (a *App) RepairCache() error {
 	return a.ui.RepairCache()
 }
 
+// CheckBackend runs health checks from Go side and returns status
+func (a *App) CheckBackend() HealthStatus {
+	return a.ui.CheckBackend()
+}
+
 // GetSettings returns launcher settings
 func (a *App) GetSettings() (*Settings, error) {
 	return a.ui.GetSettings()
