@@ -48,6 +48,8 @@ export interface SessionStatus {
   downloadSpeed?: number;
   eta?: number;
   errors?: string[];
+  serverName?: string; // Associated server name for display
+  serverId?: string;   // Associated server ID
 }
 
 /** UI settings — maps to LauncherSettings via settingsToLauncher */

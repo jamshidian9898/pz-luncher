@@ -63,6 +63,8 @@ function App() {
       progress: 0,
       currentMod: 'Connecting to backend…',
       errors: [],
+      serverName: server.name,
+      serverId: server.id,
     });
 
     try {

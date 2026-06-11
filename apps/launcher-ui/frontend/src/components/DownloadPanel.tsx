@@ -156,13 +156,17 @@ function CompletedSessionsList({ sessions }: { sessions: SessionStatus[] }) {
 }
 
 function CompletedCard({ session }: { session: SessionStatus }) {
-  const currentServer = useSessionStore(s => s.currentServer);
-  const label = currentServer?.name ?? `Session ${session.sessionId.slice(-8)}`;
+  const label = session.serverName ?? `Session ${session.sessionId.slice(-8)}`;
   return (
     <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
       <CheckCircle size={16} className="text-emerald-400 shrink-0" />
-      <span className="text-sm text-slate-300 flex-1">{label}</span>
-      <span className="text-xs text-emerald-400">Ready</span>
+      <div className="flex-1 min-w-0">
+        <span className="text-sm text-slate-300 block truncate">{label}</span>
+        {session.serverId && (
+          <span className="text-xs text-slate-500">{session.serverId}</span>
+        )}
+      </div>
+      <span className="text-xs text-emerald-400 shrink-0">Ready</span>
     </div>
   );
 }

@@ -57,10 +57,18 @@ export function reduceLauncherEvent(
   const progress = event.payload?.progress;
 
   switch (event.type) {
-    case LauncherEventType.SessionStart:
+    case LauncherEventType.SessionStart: {
+      const serverIdFromEvent = event.payload?.metadata?.serverId as string | undefined;
+      // Preserve serverName/serverId from optimistic session if it exists
+      const serverId = serverIdFromEvent ?? session?.serverId;
+      const serverName = session?.serverName;
       return {
         downloads: {
-          sessionUpdate: createSessionStatus(event.sessionId),
+          sessionUpdate: {
+            ...createSessionStatus(event.sessionId),
+            serverId,
+            serverName,
+          },
         },
         session: {
           currentSessionId: event.sessionId,
@@ -78,6 +86,7 @@ export function reduceLauncherEvent(
           ],
         },
       };
+    }
 
     case LauncherEventType.ModResolveStart:
       return {

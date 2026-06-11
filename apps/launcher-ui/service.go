@@ -35,6 +35,10 @@ type UIService struct {
 func NewUIService() *UIService {
 	root := pipeline.WorkspaceRoot()
 	st, _ := settings.Load(root)
+	// Apply game path env immediately so launch can find executable
+	if st != nil {
+		settings.ApplyGamePathEnv(st)
+	}
 	return &UIService{
 		workspaceRoot: root,
 		pipeline:      pipeline.NewService(settings.ToPipelineConfig(root, st)),
@@ -53,6 +57,9 @@ func (s *UIService) getWorkspaceRoot() string {
 func (s *UIService) ReloadConfig() {
 	root := pipeline.WorkspaceRoot()
 	st, _ := settings.Load(root)
+	if st != nil {
+		settings.ApplyGamePathEnv(st)
+	}
 	s.mu.Lock()
 	s.workspaceRoot = root
 	s.pipeline = pipeline.NewService(settings.ToPipelineConfig(root, st))
@@ -428,6 +435,8 @@ func (s *UIService) GetSettings() (*Settings, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Ensure game path env is set for launch to find executable
+	settings.ApplyGamePathEnv(st)
 	return sharedToUI(st), nil
 }
 
