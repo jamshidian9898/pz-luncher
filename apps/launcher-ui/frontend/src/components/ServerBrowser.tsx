@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { ServerInfo, ServerDetails } from '../types';
 import { launcherApi } from '../wails';
 import { useSessionStore } from '../stores/session.store';
+import { useDownloadsStore } from '../stores/downloads.store';
 import {
   Monitor, Users, Wifi, Package, ChevronRight,
   RefreshCw, Star, StarOff, AlertCircle, Play,
+  CheckCircle2, Loader2, Gamepad2, Download,
 } from 'lucide-react';
 
 interface ServerBrowserProps {
@@ -142,12 +144,15 @@ interface ServerCardProps {
 }
 
 function ServerCard({ server, selected, favorite, onSelect, onFavorite, onJoin, onLaunch }: ServerCardProps) {
-  const currentServer = useSessionStore(s => s.currentServer);
-  const launchState   = useSessionStore(s => s.launchState);
-  const isReadyToLaunch = currentServer?.id === server.id && launchState === 'complete';
+  const status = useServerStatus(server.id);
   const fill = server.maxPlayers > 0
     ? Math.round((server.playerCount / server.maxPlayers) * 100)
     : 0;
+
+  // Determine button state based on server status
+  const showLaunch = status === 'ready' || status === 'running';
+  const isRunning = status === 'running';
+  const isDownloading = status === 'downloading';
 
   return (
     <div
@@ -189,6 +194,7 @@ function ServerCard({ server, selected, favorite, onSelect, onFavorite, onJoin, 
               <Package size={11} />
               {server.modCount} mods
             </span>
+            <StatusBadge status={status} />
           </div>
 
           {/* Player fill bar */}
@@ -205,17 +211,27 @@ function ServerCard({ server, selected, favorite, onSelect, onFavorite, onJoin, 
         </div>
       </div>
 
-      {/* Join/Launch button — appears on hover / select */}
-      {isReadyToLaunch && onLaunch ? (
+      {/* Join/Launch/Running button — appears on hover / select */}
+      {isDownloading ? (
         <button
-          onClick={(e) => { e.stopPropagation(); onLaunch(); }}
+          disabled
+          className="absolute right-3 bottom-3 px-3 py-1 rounded text-xs font-medium bg-slate-700 text-slate-400 cursor-not-allowed flex items-center gap-1"
+        >
+          <Loader2 size={12} className="animate-spin" /> Downloading
+        </button>
+      ) : showLaunch && onLaunch ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); if (!isRunning) onLaunch(); }}
+          disabled={isRunning}
           className={`absolute right-3 bottom-3 px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 ${
-            selected
-              ? 'bg-emerald-600 hover:bg-emerald-500 text-white opacity-100'
-              : 'bg-emerald-600 hover:bg-emerald-500 text-white opacity-0 group-hover:opacity-100'
+            isRunning
+              ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+              : selected
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white opacity-100'
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white opacity-0 group-hover:opacity-100'
           }`}
         >
-          <Play size={12} /> Launch
+          {isRunning ? <><Gamepad2 size={12} /> Running</> : <><Play size={12} /> Launch</>}
         </button>
       ) : (
         <button
@@ -236,6 +252,7 @@ function ServerCard({ server, selected, favorite, onSelect, onFavorite, onJoin, 
 /* ── Detail Panel ── */
 function DetailPanel({ details, onJoin, onLaunch }: { details: ServerDetails; onJoin: () => void; onLaunch?: () => void }) {
   const totalMB = (details.totalSize / 1024 / 1024).toFixed(0);
+  const status = useServerStatus(details.id);
 
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-5">
@@ -243,7 +260,10 @@ function DetailPanel({ details, onJoin, onLaunch }: { details: ServerDetails; on
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-slate-100">{details.name}</h2>
-          <p className="text-sm text-slate-400 mt-1">{details.description}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-sm text-slate-400">{details.description}</p>
+            <StatusBadge status={status} />
+          </div>
         </div>
         <ServerActionButton
           serverId={details.id}
@@ -291,11 +311,34 @@ function DetailPanel({ details, onJoin, onLaunch }: { details: ServerDetails; on
 
 /* ── Server Action Button Helper ── */
 function ServerActionButton({ serverId, onJoin, onLaunch }: { serverId: string; onJoin: () => void; onLaunch?: () => void }) {
-  const currentServer = useSessionStore(s => s.currentServer);
-  const launchState   = useSessionStore(s => s.launchState);
-  const isReadyToLaunch = currentServer?.id === serverId && launchState === 'complete';
+  const status = useServerStatus(serverId);
 
-  if (isReadyToLaunch && onLaunch) {
+  // Downloading state
+  if (status === 'downloading') {
+    return (
+      <button
+        disabled
+        className="shrink-0 flex items-center gap-2 px-5 py-2 bg-slate-700 text-slate-400 rounded-lg text-sm font-medium cursor-not-allowed"
+      >
+        <Loader2 size={16} className="animate-spin" /> Downloading...
+      </button>
+    );
+  }
+
+  // Running state
+  if (status === 'running') {
+    return (
+      <button
+        disabled
+        className="shrink-0 flex items-center gap-2 px-5 py-2 bg-slate-700 text-emerald-400 rounded-lg text-sm font-medium cursor-not-allowed"
+      >
+        <Gamepad2 size={16} /> Game Running
+      </button>
+    );
+  }
+
+  // Ready to launch
+  if (status === 'ready' && onLaunch) {
     return (
       <button
         onClick={onLaunch}
@@ -305,6 +348,20 @@ function ServerActionButton({ serverId, onJoin, onLaunch }: { serverId: string; 
       </button>
     );
   }
+
+  // Needs update
+  if (status === 'needs-update') {
+    return (
+      <button
+        onClick={onJoin}
+        className="shrink-0 flex items-center gap-2 px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition-colors"
+      >
+        <Download size={16} /> Update Mods
+      </button>
+    );
+  }
+
+  // Not joined - default join button
   return (
     <button
       onClick={onJoin}
@@ -403,5 +460,83 @@ function EmptyState({ onRetry }: { onRetry: () => void }) {
         <RefreshCw size={12} /> Refresh
       </button>
     </div>
+  );
+}
+
+/* ── Server Status Helpers ── */
+type ServerStatus = 'not-joined' | 'downloading' | 'ready' | 'running' | 'needs-update';
+
+function useServerStatus(serverId: string): ServerStatus {
+  const sessions = useDownloadsStore(s => s.sessions);
+  const currentServer = useSessionStore(s => s.currentServer);
+  const launchState = useSessionStore(s => s.launchState);
+
+  return useMemo(() => {
+    // Check if game is currently running for this server
+    if (currentServer?.id === serverId && launchState === 'running') {
+      return 'running';
+    }
+
+    // Find any session for this server
+    const serverSessions = Array.from(sessions.values()).filter(
+      s => s.serverId === serverId
+    );
+
+    // Check if currently downloading/installing
+    const activeSession = serverSessions.find(
+      s => s.state === 'downloading' || s.state === 'resolving' || s.state === 'installing'
+    );
+    if (activeSession) {
+      return 'downloading';
+    }
+
+    // Check if completed/ready
+    const completedSession = serverSessions.find(s => s.state === 'complete');
+    if (completedSession) {
+      // Check if currently selected and ready
+      if (currentServer?.id === serverId && launchState === 'complete') {
+        return 'ready';
+      }
+      // Has been joined before but not currently selected
+      return 'ready';
+    }
+
+    return 'not-joined';
+  }, [sessions, currentServer, launchState, serverId]);
+}
+
+function StatusBadge({ status }: { status: ServerStatus }) {
+  const configs = {
+    'not-joined': { icon: null, text: '', className: '' },
+    'downloading': {
+      icon: <Loader2 size={10} className="animate-spin" />,
+      text: 'Downloading',
+      className: 'bg-blue-500/20 text-blue-400'
+    },
+    'ready': {
+      icon: <CheckCircle2 size={10} />,
+      text: 'Ready',
+      className: 'bg-emerald-500/20 text-emerald-400'
+    },
+    'running': {
+      icon: <Gamepad2 size={10} />,
+      text: 'Playing',
+      className: 'bg-emerald-500/30 text-emerald-300'
+    },
+    'needs-update': {
+      icon: <Download size={10} />,
+      text: 'Update',
+      className: 'bg-amber-500/20 text-amber-400'
+    },
+  };
+
+  const config = configs[status];
+  if (!config.text) return null;
+
+  return (
+    <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${config.className}`}>
+      {config.icon}
+      {config.text}
+    </span>
   );
 }
