@@ -1,6 +1,6 @@
 import { useSessionStore } from '../stores/session.store';
 import { useDownloadsStore } from '../stores/downloads.store';
-import { CheckCircle, Loader2, AlertCircle, Play, RefreshCw, Wrench } from 'lucide-react';
+import { CheckCircle, Loader2, AlertCircle, Play, RefreshCw, Wrench, Square } from 'lucide-react';
 
 interface Step {
   id: string;
@@ -29,11 +29,12 @@ function stepStatus(step: Step, currentState: string): 'done' | 'active' | 'pend
 
 interface SessionProgressCardProps {
   onLaunch?: () => void;
+  onStop?: () => void;
   onRetry?: () => void;
   onRepairCache?: () => void;
 }
 
-export function SessionProgressCard({ onLaunch, onRetry, onRepairCache }: SessionProgressCardProps) {
+export function SessionProgressCard({ onLaunch, onStop, onRetry, onRepairCache }: SessionProgressCardProps) {
   const launchState   = useSessionStore(s => s.launchState);
   const currentServer = useSessionStore(s => s.currentServer);
   const sessionId     = useSessionStore(s => s.currentSessionId);
@@ -73,9 +74,20 @@ export function SessionProgressCard({ onLaunch, onRetry, onRepairCache }: Sessio
         {(isComplete || isRunning) && (
           <div className="flex items-center gap-2">
             {isRunning && (
-              <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-xs font-medium">
-                <Loader2 size={12} className="animate-spin" /> Running
-              </span>
+              <>
+                <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-xs font-medium">
+                  <Loader2 size={12} className="animate-spin" /> Running
+                </span>
+                {onStop && (
+                  <button
+                    onClick={onStop}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <Square size={14} fill="currentColor" />
+                    Stop
+                  </button>
+                )}
+              </>
             )}
             {isComplete && onLaunch && (
               <button

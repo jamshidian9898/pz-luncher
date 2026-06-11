@@ -109,17 +109,32 @@ export function ServerBrowser({ onJoin, onLaunch }: ServerBrowserProps) {
       {/* Detail panel */}
       <div className="flex-1 overflow-y-auto">
         {selected && (
-          detailsLoading
-            ? <DetailSkeleton />
-            : details
-            ? <DetailPanel details={details} onJoin={() => onJoin(details)} />
-            : <DetailPanelFallback
-                server={servers.find(s => s.id === selected)!}
-                onJoin={() => {
-                  const srv = servers.find(s => s.id === selected);
-                  if (srv) onJoin(srv);
-                }}
+          (() => {
+            const selectedServer = servers.find(s => s.id === selected);
+            if (!selectedServer) return null;
+            
+            if (detailsLoading) {
+              return <DetailSkeleton />;
+            }
+            
+            if (details) {
+              return (
+                <DetailPanel 
+                  details={details} 
+                  onJoin={() => onJoin(selectedServer)}
+                  onLaunch={onLaunch ? () => onLaunch(selectedServer) : undefined}
+                />
+              );
+            }
+            
+            return (
+              <DetailPanelFallback
+                server={selectedServer}
+                onJoin={() => onJoin(selectedServer)}
+                onLaunch={onLaunch ? () => onLaunch(selectedServer) : undefined}
               />
+            );
+          })()
         )}
         {!selected && (
           <div className="flex flex-col items-center justify-center h-full text-slate-500">

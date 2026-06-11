@@ -79,6 +79,8 @@ declare global {
         App: {
           JoinServer(serverId: string): Promise<void>;
           LaunchServer(serverId: string): Promise<void>;
+          StopGame(): Promise<void>;
+          IsGameRunning(): Promise<boolean>;
           GetServerList(): Promise<ServerInfo[]>;
           GetServerDetails(serverId: string): Promise<ServerDetails>;
           GetSessionStatus(sessionId: string): Promise<SessionStatus>;

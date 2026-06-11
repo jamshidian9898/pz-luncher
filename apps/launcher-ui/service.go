@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"pzlauncher/libs/game"
 	"pzlauncher/libs/pipeline"
 	"pzlauncher/libs/settings"
 	"pzlauncher/libs/sharedtypes"
@@ -69,6 +70,37 @@ func (s *UIService) ReloadConfig() {
 // SetContext sets Wails context for events
 func (s *UIService) SetContext(ctx context.Context) {
 	s.ctx = ctx
+	// Start game state polling
+	s.startGameStatePolling()
+}
+
+// startGameStatePolling periodically checks if the game is running and emits events on state change
+func (s *UIService) startGameStatePolling() {
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+
+		wasRunning := false
+		for range ticker.C {
+			if s.ctx == nil {
+				continue
+			}
+
+			isRunning := game.IsGameRunning()
+			if wasRunning && !isRunning {
+				// Game was running but now stopped - emit exit event
+				s.emitEvent(UIEvent{
+					Type:      "launch.exited",
+					Timestamp: time.Now().Unix(),
+					Metadata: map[string]interface{}{
+						"success": true,
+						"message": "Game process exited",
+					},
+				})
+			}
+			wasRunning = isRunning
+		}
+	}()
 }
 
 func (s *UIService) emitEvent(event UIEvent) {
@@ -220,6 +252,21 @@ func (s *UIService) LaunchServer(serverID string) error {
 		_ = s.pipeline.Launch(context.Background(), serverID, join.ProfilePath, s.pipelineEmit())
 	}()
 	return nil
+}
+
+// StopGame terminates the running game process.
+func (s *UIService) StopGame() error {
+	return game.StopGame()
+}
+
+// IsGameRunning returns true if the game is currently running.
+func (s *UIService) IsGameRunning() bool {
+	return game.IsGameRunning()
+}
+
+// GetGameRuntime returns how long the game has been running.
+func (s *UIService) GetGameRuntime() string {
+	return game.GetGameRuntime().String()
 }
 
 // GetServerList fetches the server list from the Backend registry API (A2).

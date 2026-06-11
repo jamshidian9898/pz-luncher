@@ -6,10 +6,68 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 
 	"pzlauncher/libs/contracts"
 )
+
+// ProcessTracker keeps track of running game processes
+type ProcessTracker struct {
+	mu        sync.RWMutex
+	process   *os.Process
+	startTime time.Time
+	running   bool
+}
+
+var (
+	globalTracker = &ProcessTracker{}
+)
+
+// IsGameRunning returns true if the game process is still running
+func IsGameRunning() bool {
+	globalTracker.mu.RLock()
+	defer globalTracker.mu.RUnlock()
+
+	if !globalTracker.running || globalTracker.process == nil {
+		return false
+	}
+
+	// Check if process is still alive
+	if err := globalTracker.process.Signal(os.Signal(nil)); err != nil {
+		globalTracker.running = false
+		return false
+	}
+	return true
+}
+
+// StopGame terminates the running game process
+func StopGame() error {
+	globalTracker.mu.Lock()
+	defer globalTracker.mu.Unlock()
+
+	if !globalTracker.running || globalTracker.process == nil {
+		return fmt.Errorf("no game process running")
+	}
+
+	if err := globalTracker.process.Kill(); err != nil {
+		return fmt.Errorf("failed to stop game: %w", err)
+	}
+
+	globalTracker.running = false
+	return nil
+}
+
+// GetGameRuntime returns how long the game has been running
+func GetGameRuntime() time.Duration {
+	globalTracker.mu.RLock()
+	defer globalTracker.mu.RUnlock()
+
+	if !globalTracker.running {
+		return 0
+	}
+	return time.Since(globalTracker.startTime)
+}
 
 type simpleFinder struct{}
 
@@ -89,6 +147,22 @@ func (l *simpleLauncher) Launch(installation contracts.GameInstallation, request
 	if err := cmd.Start(); err != nil {
 		return contracts.LaunchResult{Success: false, Error: fmt.Sprintf("Failed to start game: %v", err)}, err
 	}
+
+	// Track the process
+	globalTracker.mu.Lock()
+	globalTracker.process = cmd.Process
+	globalTracker.startTime = time.Now()
+	globalTracker.running = true
+	globalTracker.mu.Unlock()
+
+	// Start goroutine to wait for process exit
+	go func() {
+		cmd.Wait()
+		globalTracker.mu.Lock()
+		globalTracker.running = false
+		globalTracker.process = nil
+		globalTracker.mu.Unlock()
+	}()
 
 	// Don't wait for process - let it run independently
 	return contracts.LaunchResult{Success: true, ProfileID: profilePath, LaunchArgs: request.LaunchArgs}, nil

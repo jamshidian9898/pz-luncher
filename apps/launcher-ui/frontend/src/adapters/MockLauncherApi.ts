@@ -73,6 +73,14 @@ export class MockLauncherApi implements LauncherApi {
     return Promise.resolve();
   }
 
+  async stopGame(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  async isGameRunning(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
   async getSessionStatus(sessionId: string): Promise<SessionStatus> {
     return { sessionId, state: 'complete', progress: 100 };
   }

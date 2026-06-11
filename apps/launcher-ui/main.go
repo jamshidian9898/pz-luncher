@@ -61,6 +61,16 @@ func (a *App) LaunchServer(serverID string) error {
 	return a.ui.LaunchServer(serverID)
 }
 
+// StopGame terminates the running game process
+func (a *App) StopGame() error {
+	return a.ui.StopGame()
+}
+
+// IsGameRunning returns true if the game is currently running
+func (a *App) IsGameRunning() bool {
+	return a.ui.IsGameRunning()
+}
+
 // GetServerList returns list of available servers
 func (a *App) GetServerList() []ServerInfo {
 	return a.ui.GetServerList()

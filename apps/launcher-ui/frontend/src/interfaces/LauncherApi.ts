@@ -5,5 +5,7 @@ export interface LauncherApi {
   getServerDetails(serverId: string): Promise<ServerDetails>;
   joinServer(serverId: string): Promise<void>;
   launchServer(serverId: string): Promise<void>;
+  stopGame(): Promise<void>;
+  isGameRunning(): Promise<boolean>;
   getSessionStatus(sessionId: string): Promise<SessionStatus>;
 }

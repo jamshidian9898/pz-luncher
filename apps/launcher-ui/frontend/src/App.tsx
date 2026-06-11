@@ -99,6 +99,16 @@ function App() {
     }
   };
 
+  const handleStopGame = async () => {
+    try {
+      await launcherApi.stopGame();
+      // Game stopped - go back to ready state
+      useSessionStore.getState().setLaunchState('complete');
+    } catch (err) {
+      console.error('Failed to stop game:', err);
+    }
+  };
+
   const canLaunch =
     launchState === 'complete' &&
     currentServer != null;
@@ -147,6 +157,7 @@ function App() {
         <div className="p-4 border-t border-slate-700 space-y-3">
           <SessionProgressCard
             onLaunch={canLaunch && currentServer ? () => handleLaunchServer(currentServer) : undefined}
+            onStop={launchState === 'running' ? handleStopGame : undefined}
             onRetry={launchState === 'error' ? handleRetry : undefined}
             onRepairCache={launchState === 'error' ? handleRepairCache : undefined}
           />

@@ -310,6 +310,24 @@ export function reduceLauncherEvent(
         },
       };
 
+    case LauncherEventType.LaunchExited:
+      // Game process exited - reset to complete state so user can launch again
+      return {
+        session: {
+          launchState: 'complete',
+        },
+        trace: {
+          addEvents: [
+            {
+              type: 'complete',
+              modId: 'launch',
+              modName: 'Game exited',
+              state: 'complete',
+            },
+          ],
+        },
+      };
+
     default:
       return {
         trace: {

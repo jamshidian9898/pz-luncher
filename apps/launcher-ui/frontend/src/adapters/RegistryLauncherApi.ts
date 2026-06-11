@@ -90,6 +90,15 @@ export class RegistryLauncherApi implements LauncherApi {
     await fetchJSON(`${DEV_API_BASE}/launch/${encodeURIComponent(serverId)}`, { method: 'POST' });
   }
 
+  async stopGame(): Promise<void> {
+    await fetchJSON(`${DEV_API_BASE}/stop`, { method: 'POST' });
+  }
+
+  async isGameRunning(): Promise<boolean> {
+    const result = await fetchJSON<{ running: boolean }>(`${DEV_API_BASE}/running`, { method: 'GET' });
+    return result.running;
+  }
+
   async getSessionStatus(sessionId: string): Promise<SessionStatus> {
     return { sessionId, state: 'complete', progress: 100 };
   }

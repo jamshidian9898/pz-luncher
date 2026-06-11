@@ -10,6 +10,7 @@ export enum LauncherEventType {
   InstallComplete = 'install.complete',
   Error = 'error',
   LaunchStateChanged = 'launch.state.changed',
+  LaunchExited = 'launch.exited',
   ProviderDecision = 'provider.decision',
   TraceUpdated = 'trace.updated',
   ServerUpdated = 'server.updated',
@@ -72,6 +73,8 @@ export function normalizeLauncherEvent(event: any): LauncherEvent {
       return { type: LauncherEventType.Error, timestamp, version, sessionId, payload };
     case 'launch.state.changed':
       return { type: LauncherEventType.LaunchStateChanged, timestamp, version, sessionId, payload };
+    case 'launch.exited':
+      return { type: LauncherEventType.LaunchExited, timestamp, version, sessionId, payload };
     case 'trace.updated':
       return { type: LauncherEventType.TraceUpdated, timestamp, version, sessionId, payload };
     case 'server.updated':
