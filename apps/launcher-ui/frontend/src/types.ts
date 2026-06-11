@@ -80,6 +80,12 @@ declare global {
           GetServerDetails(serverId: string): Promise<ServerDetails>;
           GetSessionStatus(sessionId: string): Promise<SessionStatus>;
           RepairCache(): Promise<void>;
+          CheckBackend(): Promise<{
+            backendUrl: string; backend: string; backendMsg: string;
+            agents: string; agentsMsg: string;
+            servers: string; serversMsg: string;
+            workspaceRoot: string; settingsPath: string;
+          }>;
           GetSettings(): Promise<Settings>;
           SaveSettings(settings: Settings): Promise<void>;
         };

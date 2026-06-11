@@ -12,7 +12,7 @@ function detectOS(): string {
   return 'Unknown';
 }
 
-function buildDiagnostics() {
+async function buildDiagnostics() {
   const session   = useSessionStore.getState();
   const downloads = useDownloadsStore.getState();
   const settings  = useSettingsStore.getState();
@@ -34,8 +34,10 @@ function buildDiagnostics() {
     joinDurationSeconds: joinDuration,
     settings: {
       gamePath: settings.settings?.gamePath ? '(set)' : '(empty)',
+      backendUrl: settings.settings?.backendUrl || '(not set — will use localhost:8080)',
       cacheLocation: settings.settings?.cacheLocation || '(default)',
       profilesLocation: settings.settings?.profilesLocation || '(default)',
+      maxConcurrent: settings.settings?.maxConcurrent ?? '(not set)',
       verifyChecksum: settings.settings?.verifyChecksum ?? true,
     },
     lastSession: lastSession
@@ -48,6 +50,15 @@ function buildDiagnostics() {
       : null,
     totalSessions: sessions.length,
     failedSessions: sessions.filter(s => s.state === 'error').length,
+    debug: await (async () => {
+      if (typeof (window as any).go?.main?.App?.CheckBackend === 'function') {
+        try {
+          const h = await (window as any).go.main.App.CheckBackend();
+          return { workspaceRoot: h.workspaceRoot, settingsPath: h.settingsPath, backendUrl: h.backendUrl };
+        } catch { return { error: 'CheckBackend failed' }; }
+      }
+      return { mode: 'browser-dev' };
+    })(),
   };
 }
 
@@ -55,7 +66,7 @@ export function DiagnosticsButton() {
   const [copied, setCopied] = useState(false);
 
   async function copyDiagnostics() {
-    const data = buildDiagnostics();
+    const data = await buildDiagnostics();
     const text = JSON.stringify(data, null, 2);
     try {
       await navigator.clipboard.writeText(text);

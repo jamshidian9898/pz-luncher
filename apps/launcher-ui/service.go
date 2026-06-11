@@ -334,19 +334,26 @@ func (s *UIService) RepairCache() error {
 
 // HealthStatus holds result of a single health check
 type HealthStatus struct {
-	BackendURL string `json:"backendUrl"`
-	Backend    string `json:"backend"` // "ok" | "fail"
-	BackendMsg string `json:"backendMsg"`
-	Agents     string `json:"agents"` // "ok" | "warn" | "fail"
-	AgentsMsg  string `json:"agentsMsg"`
-	Servers    string `json:"servers"` // "ok" | "warn" | "fail"
-	ServersMsg string `json:"serversMsg"`
+	BackendURL    string `json:"backendUrl"`
+	Backend       string `json:"backend"` // "ok" | "fail"
+	BackendMsg    string `json:"backendMsg"`
+	Agents        string `json:"agents"` // "ok" | "warn" | "fail"
+	AgentsMsg     string `json:"agentsMsg"`
+	Servers       string `json:"servers"` // "ok" | "warn" | "fail"
+	ServersMsg    string `json:"serversMsg"`
+	WorkspaceRoot string `json:"workspaceRoot"` // debug: where settings are stored
+	SettingsPath  string `json:"settingsPath"`  // debug: full path to settings file
 }
 
 // CheckBackend runs health checks from Go side (avoids WebView fetch issues)
 func (s *UIService) CheckBackend() HealthStatus {
+	root := s.getWorkspaceRoot()
 	base := s.backendURL()
-	result := HealthStatus{BackendURL: base}
+	result := HealthStatus{
+		BackendURL:    base,
+		WorkspaceRoot: root,
+		SettingsPath:  fmt.Sprintf("%s/config/launcher-settings.json", root),
+	}
 
 	// 1. Backend reachable
 	type serversResp struct {
