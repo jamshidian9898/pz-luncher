@@ -140,6 +140,7 @@ func ToPipelineConfig(root string, s *sharedtypes.LauncherSettings) pipeline.Con
 		cfg.ProfilesDir = s.ProfilesPath
 		cfg.SessionsDir = filepath.Join(s.ProfilesPath, ".sessions")
 	}
+	cfg.LaunchOptions = s.LaunchOptions
 	return cfg
 }
 

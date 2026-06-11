@@ -80,6 +80,16 @@ export function SettingsPanel() {
           />
         </SettingRow>
 
+        <SettingRow label="Launch Options">
+          <input
+            type="text"
+            value={settings.launchOptions ?? ''}
+            onChange={(e) => setSettings({ ...settings, launchOptions: e.target.value })}
+            placeholder="-debug -nosound (additional arguments)"
+            className="w-96 max-w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-emerald-500"
+          />
+        </SettingRow>
+
         <SettingRow label="Backend URL">
           <input
             type="text"

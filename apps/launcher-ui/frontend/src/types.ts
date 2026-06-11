@@ -61,6 +61,7 @@ export interface Settings {
   maxConcurrent: number;
   bandwidthLimit: number;
   verifyChecksum: boolean;
+  launchOptions?: string; // Additional launch arguments (e.g., "-debug -nosound")
 }
 
 export interface Progress {

@@ -461,6 +461,7 @@ func sharedToUI(st *sharedtypes.LauncherSettings) *Settings {
 		MaxConcurrent:    st.ConcurrentDownloads,
 		BandwidthLimit:   st.BandwidthLimitMbps,
 		VerifyChecksum:   st.VerifyChecksum,
+		LaunchOptions:    st.LaunchOptions,
 	}
 }
 
@@ -473,6 +474,7 @@ func uiToShared(ui Settings) *sharedtypes.LauncherSettings {
 		ConcurrentDownloads: ui.MaxConcurrent,
 		BandwidthLimitMbps:  ui.BandwidthLimit,
 		VerifyChecksum:      ui.VerifyChecksum,
+		LaunchOptions:       ui.LaunchOptions,
 	}
 }
 

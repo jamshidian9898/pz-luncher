@@ -54,13 +54,14 @@ func (m *ServerManifest) ProfileID() string {
 
 // LauncherSettings (RFC-0036 v2.0.0)
 type LauncherSettings struct {
-	GamePath              string `json:"gamePath,omitempty"`
-	BackendURL            string `json:"backendUrl,omitempty"`
-	CachePath             string `json:"cachePath,omitempty"`
-	ProfilesPath          string `json:"profilesPath,omitempty"`
-	ConcurrentDownloads   int    `json:"concurrentDownloads,omitempty"`
-	BandwidthLimitMbps    int    `json:"bandwidthLimitMbps,omitempty"`
-	VerifyChecksum        bool   `json:"verifyChecksum,omitempty"`
+	GamePath            string `json:"gamePath,omitempty"`
+	BackendURL          string `json:"backendUrl,omitempty"`
+	CachePath           string `json:"cachePath,omitempty"`
+	ProfilesPath        string `json:"profilesPath,omitempty"`
+	ConcurrentDownloads int    `json:"concurrentDownloads,omitempty"`
+	BandwidthLimitMbps  int    `json:"bandwidthLimitMbps,omitempty"`
+	VerifyChecksum      bool   `json:"verifyChecksum,omitempty"`
+	LaunchOptions       string `json:"launchOptions,omitempty"`
 }
 
 // LauncherEvent (RFC-0022)

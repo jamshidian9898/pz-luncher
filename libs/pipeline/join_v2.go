@@ -171,12 +171,18 @@ func (s *Service) LaunchFromBackend(ctx context.Context, serverID, profilePath s
 		return err
 	}
 
+	// Combine manifest launch args with user settings launch options
+	allArgs := jr.Manifest.LaunchArgs
+	if s.cfg.LaunchOptions != "" {
+		allArgs = append(allArgs, strings.Fields(s.cfg.LaunchOptions)...)
+	}
+
 	launcher := game.NewSimpleLauncher()
 	req := contracts.LaunchRequest{
 		ServerID:   serverID,
 		ProfileID:  profilePath,
 		ManifestID: jr.Manifest.ServerID + "-v" + jr.Manifest.VersionString(),
-		LaunchArgs: strings.Join(jr.Manifest.LaunchArgs, " "),
+		LaunchArgs: strings.Join(allArgs, " "),
 	}
 	res, err := launcher.Launch(inst, req)
 	if err != nil || !res.Success {

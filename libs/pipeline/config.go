@@ -7,13 +7,14 @@ import (
 )
 
 type Config struct {
-	Root         string
-	CacheDir     string
-	ProfilesDir  string
-	SessionsDir  string
-	RegistryPath string
-	DemoSeedMods []string // mod ids to seed into cache (offline demo)
-	AutoLaunch   bool
+	Root          string
+	CacheDir      string
+	ProfilesDir   string
+	SessionsDir   string
+	RegistryPath  string
+	DemoSeedMods  []string // mod ids to seed into cache (offline demo)
+	AutoLaunch    bool
+	LaunchOptions string // User-defined launch arguments (e.g., "-debug -nosound")
 }
 
 func DefaultConfig(root string) Config {

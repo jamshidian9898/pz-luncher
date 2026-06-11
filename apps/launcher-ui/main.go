@@ -149,6 +149,7 @@ type Settings struct {
 	MaxConcurrent    int    `json:"maxConcurrent"`
 	BandwidthLimit   int    `json:"bandwidthLimit"`
 	VerifyChecksum   bool   `json:"verifyChecksum"`
+	LaunchOptions    string `json:"launchOptions,omitempty"`
 }
 
 func main() {
