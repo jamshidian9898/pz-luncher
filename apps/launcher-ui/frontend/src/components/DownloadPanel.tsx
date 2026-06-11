@@ -1,11 +1,16 @@
 import { SessionStatus } from '../types';
-import { Download, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
+import { useSessionStore } from '../stores/session.store';
+import { Download, CheckCircle, Loader2, AlertCircle, Play } from 'lucide-react';
 
 interface DownloadPanelProps {
   sessions: SessionStatus[];
+  onLaunch?: () => void;
 }
 
-export function DownloadPanel({ sessions }: DownloadPanelProps) {
+export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
+  const launchState   = useSessionStore(s => s.launchState);
+  const currentServer = useSessionStore(s => s.currentServer);
+  const isComplete    = launchState === 'complete';
   const activeSessions = sessions.filter(
     s => s.state === 'downloading' || s.state === 'resolving' || s.state === 'installing'
   );
@@ -18,6 +23,32 @@ export function DownloadPanel({ sessions }: DownloadPanelProps) {
         <Download size={48} className="mb-4 opacity-50" />
         <p>No active downloads</p>
         <p className="text-sm mt-2">Join a server to start downloading mods</p>
+      </div>
+    );
+  }
+
+  // If session completed instantly (0 mods), show a dedicated ready card
+  if (isComplete && activeSessions.length === 0 && completedSessions.length > 0 && currentServer) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-emerald-900/20 border border-emerald-500/40 rounded-xl p-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CheckCircle size={24} className="text-emerald-400 shrink-0" />
+            <div>
+              <p className="font-semibold text-emerald-300">{currentServer.name}</p>
+              <p className="text-sm text-slate-400">No mods required — server is ready to join</p>
+            </div>
+          </div>
+          {onLaunch && (
+            <button
+              onClick={onLaunch}
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <Play size={16} /> Launch
+            </button>
+          )}
+        </div>
+        <CompletedSessionsList sessions={completedSessions} />
       </div>
     );
   }
@@ -54,16 +85,7 @@ export function DownloadPanel({ sessions }: DownloadPanelProps) {
 
       {/* Completed */}
       {completedSessions.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wide">
-            Completed ({completedSessions.length})
-          </h3>
-          <div className="space-y-2">
-            {completedSessions.map(session => (
-              <CompletedCard key={session.sessionId} session={session} />
-            ))}
-          </div>
-        </div>
+        <CompletedSessionsList sessions={completedSessions} />
       )}
     </div>
   );
@@ -118,13 +140,28 @@ function DownloadCard({ session }: { session: SessionStatus }) {
   );
 }
 
+function CompletedSessionsList({ sessions }: { sessions: SessionStatus[] }) {
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wide">
+        Completed ({sessions.length})
+      </h3>
+      <div className="space-y-2">
+        {sessions.map(session => (
+          <CompletedCard key={session.sessionId} session={session} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CompletedCard({ session }: { session: SessionStatus }) {
+  const currentServer = useSessionStore(s => s.currentServer);
+  const label = currentServer?.name ?? `Session ${session.sessionId.slice(-8)}`;
   return (
     <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
-      <CheckCircle size={16} className="text-emerald-400" />
-      <span className="text-sm text-slate-400 flex-1">
-        Session {session.sessionId.slice(-8)}
-      </span>
+      <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+      <span className="text-sm text-slate-300 flex-1">{label}</span>
       <span className="text-xs text-emerald-400">Ready</span>
     </div>
   );

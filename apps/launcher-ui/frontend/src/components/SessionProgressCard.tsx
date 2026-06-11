@@ -12,13 +12,16 @@ const STEPS: Step[] = [
   { id: 'resolving',   label: 'Resolving mods',    states: ['resolving'] },
   { id: 'downloading', label: 'Downloading',        states: ['downloading'] },
   { id: 'installing',  label: 'Installing',         states: ['installing', 'verifying', 'materializing'] },
-  { id: 'ready',       label: 'Ready to launch',    states: ['complete'] },
+  { id: 'ready',       label: 'Ready to launch',    states: ['complete', 'idle'] },
 ];
 
 function stepStatus(step: Step, currentState: string): 'done' | 'active' | 'pending' | 'error' {
   if (currentState === 'error') return 'pending';
+  // When fully complete, all steps are done
+  if (currentState === 'complete') return 'done';
   const currentIdx = STEPS.findIndex(s => s.states.includes(currentState));
   const stepIdx    = STEPS.indexOf(step);
+  if (currentIdx === -1) return 'pending';
   if (stepIdx < currentIdx) return 'done';
   if (step.states.includes(currentState)) return 'active';
   return 'pending';

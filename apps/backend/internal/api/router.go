@@ -178,6 +178,7 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 
 		if tokens == nil {
 			// no-auth dev mode: return a placeholder token so the agent doesn't retry.
+			reg.RecordHeartbeat(req.ServerID, 0, "")
 			writeJSON(w, http.StatusOK, map[string]string{
 				"token":    "dev-no-auth",
 				"serverId": req.ServerID,
@@ -189,6 +190,8 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 			writeError(w, http.StatusInternalServerError, "REGISTER_ERROR", err.Error())
 			return
 		}
+		// Seed initial agent state so health check shows 'online' immediately.
+		reg.RecordHeartbeat(req.ServerID, 0, "")
 		obs.Log(r.Context(), "agent.registered", "server_id", req.ServerID)
 		writeJSON(w, http.StatusOK, map[string]string{
 			"token":    token,

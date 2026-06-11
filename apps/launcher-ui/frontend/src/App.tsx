@@ -160,7 +160,10 @@ function App() {
           )}
           
           {currentView === 'downloads' && (
-            <DownloadPanel sessions={Array.from(sessions.values())} />
+            <DownloadPanel
+              sessions={Array.from(sessions.values())}
+              onLaunch={canLaunch && currentServer ? () => handleLaunchServer(currentServer) : undefined}
+            />
           )}
           
           {currentView === 'settings' && <SettingsPanel />}
