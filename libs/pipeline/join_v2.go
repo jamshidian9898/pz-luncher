@@ -29,13 +29,32 @@ type BackendModEntry struct {
 }
 
 // BackendManifest is the manifest section of JoinResponse.
+// Version is interface{} because the backend may send an int (versioned store)
+// or a string (legacy timestamp-based version).
 type BackendManifest struct {
-	ServerID    string            `json:"serverId"`
-	Version     string            `json:"version"`
-	GameVersion string            `json:"gameVersion"`
-	Mods        []backendModMeta  `json:"mods"`
-	LaunchArgs  []string          `json:"launchArgs"`
-	Profile     backendProfile    `json:"profile"`
+	ServerID    string           `json:"serverId"`
+	Version     interface{}      `json:"version"`
+	GameVersion string           `json:"gameVersion"`
+	Mods        []backendModMeta `json:"mods"`
+	LaunchArgs  []string         `json:"launchArgs"`
+	Profile     backendProfile   `json:"profile"`
+}
+
+// VersionString returns the manifest version as a string regardless of its JSON type.
+func (m *BackendManifest) VersionString() string {
+	if m.Version == nil {
+		return "0"
+	}
+	switch v := m.Version.(type) {
+	case string:
+		return v
+	case float64:
+		return fmt.Sprintf("%d", int(v))
+	case int:
+		return fmt.Sprintf("%d", v)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
 }
 
 type backendModMeta struct {
@@ -71,7 +90,7 @@ func (s *Service) RunJoinFromBackend(ctx context.Context, jr BackendJoinResponse
 
 	emit(Event{Type: "session.start", SessionID: sessionID, Metadata: map[string]interface{}{"serverId": serverID}})
 	emit(Event{Type: "manifest.loaded", SessionID: sessionID, Metadata: map[string]interface{}{
-		"serverId": serverID, "version": jr.Manifest.Version,
+		"serverId": serverID, "version": jr.Manifest.VersionString(),
 	}})
 
 	emit(Event{Type: "mod.resolve.start", SessionID: sessionID})
@@ -80,7 +99,7 @@ func (s *Service) RunJoinFromBackend(ctx context.Context, jr BackendJoinResponse
 	}})
 
 	_ = s.writeJoinTrace(serverID, sessionID, "JoinRequest", "ok", map[string]interface{}{
-		"version": jr.Manifest.Version, "modCount": len(jr.DownloadPlan),
+		"version": jr.Manifest.VersionString(), "modCount": len(jr.DownloadPlan),
 	})
 
 	// Download each mod in the plan (cache-check + HTTP download + SHA256 verify)
@@ -156,7 +175,7 @@ func (s *Service) LaunchFromBackend(ctx context.Context, serverID, profilePath s
 	req := contracts.LaunchRequest{
 		ServerID:   serverID,
 		ProfileID:  profilePath,
-		ManifestID: jr.Manifest.ServerID + "-v" + jr.Manifest.Version,
+		ManifestID: jr.Manifest.ServerID + "-v" + jr.Manifest.VersionString(),
 		LaunchArgs: strings.Join(jr.Manifest.LaunchArgs, " "),
 	}
 	res, err := launcher.Launch(inst, req)
@@ -248,7 +267,7 @@ func (s *Service) writeLaunchManifest(profilePath string, jr BackendJoinResponse
 	}
 	lm := launchManifest{
 		ServerID:   jr.Manifest.ServerID,
-		Version:    jr.Manifest.Version,
+		Version:    jr.Manifest.VersionString(),
 		LaunchArgs: jr.Manifest.LaunchArgs,
 		IssuedAt:   jr.IssuedAt,
 	}

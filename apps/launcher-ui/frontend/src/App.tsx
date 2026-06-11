@@ -44,10 +44,25 @@ function App() {
     useSessionStore.getState().setCurrentServer(server);
     selectServer(null);
     setCurrentView('downloads');
+
+    // Optimistic placeholder so DownloadPanel shows immediately (real events will overwrite)
+    const optimisticId = `optimistic-${server.id}-${Date.now()}`;
+    useSessionStore.getState().setCurrentSession(optimisticId);
+    useDownloadsStore.getState().updateSession({
+      sessionId: optimisticId,
+      state: 'resolving',
+      progress: 0,
+      currentMod: 'Connecting to backend…',
+      errors: [],
+    });
+
     try {
       await launcherApi.joinServer(server.id);
     } catch (err) {
       console.error('Failed to join server:', err);
+      useDownloadsStore.getState().failSession(optimisticId, String(err));
+      useSessionStore.getState().setLaunchState('error');
+      useSessionStore.getState().setLastError(String(err));
     }
   };
 
