@@ -94,7 +94,16 @@ func (r *Resolver) Resolve(ctx context.Context, serverID, sessionID, issuedAt st
 	manifest, err := r.loadManifest(srv)
 	if err != nil {
 		obs.LogError(ctx, "join.manifest_error", "server_id", serverID, "error", err)
-		return nil, fmt.Errorf("manifest unavailable for server %q: %w", serverID, err)
+		// If the agent is registered but hasn't pushed a manifest yet,
+		// return an empty download plan so the launcher can still join
+		// (nothing to download — game files already in place).
+		obs.Log(ctx, "join.empty_manifest_fallback", "server_id", serverID)
+		manifest = &Manifest{
+			ServerID:    serverID,
+			Version:     0,
+			GameVersion: srv.GameVersion,
+			Mods:        []ModEntry{},
+		}
 	}
 
 	plan := make([]DownloadItem, 0, len(manifest.Mods))

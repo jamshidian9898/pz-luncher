@@ -78,6 +78,7 @@ export class PatchSchemaRegistry {
     currentSessionId: { type: ['string', 'null'], required: false, allowNull: true },
     launchState: { type: 'string', oneOf: [...this.LAUNCH_STATES], required: false },
     currentServer: { type: ['object', 'null'], required: false, allowNull: true },
+    lastError: { type: ['string', 'null'], required: false, allowNull: true },
     resetSession: { type: 'boolean', required: false },
   };
 
