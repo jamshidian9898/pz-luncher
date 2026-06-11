@@ -51,29 +51,42 @@ export function SessionProgressCard({ onLaunch, onRetry, onRepairCache }: Sessio
   const errors      = session?.errors ?? [];
   const hasError    = launchState === 'error';
   const isComplete  = launchState === 'complete';
+  const isRunning   = launchState === 'running';
+  const isLaunching = launchState === 'launching';
 
   return (
     <div className={`rounded-xl border p-5 space-y-4 transition-colors ${
       hasError
         ? 'bg-red-900/20 border-red-500/40'
-        : isComplete
+        : isComplete || isRunning
         ? 'bg-emerald-900/20 border-emerald-500/40'
         : 'bg-slate-800 border-slate-700'
     }`}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Joining</p>
+          <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">
+            {isRunning ? 'Game Running' : isComplete ? 'Ready to Play' : hasError ? 'Failed' : isLaunching ? 'Launching' : 'Joining Server'}
+          </p>
           <h3 className="text-base font-semibold text-slate-100">{currentServer.name}</h3>
         </div>
-        {isComplete && onLaunch && (
-          <button
-            onClick={onLaunch}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            <Play size={16} />
-            Launch
-          </button>
+        {(isComplete || isRunning) && (
+          <div className="flex items-center gap-2">
+            {isRunning && (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-xs font-medium">
+                <Loader2 size={12} className="animate-spin" /> Running
+              </span>
+            )}
+            {isComplete && onLaunch && (
+              <button
+                onClick={onLaunch}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                <Play size={16} />
+                Launch
+              </button>
+            )}
+          </div>
         )}
         {hasError && (
           <AlertCircle size={20} className="text-red-400 shrink-0" />

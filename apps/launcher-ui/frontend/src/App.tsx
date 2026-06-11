@@ -87,10 +87,15 @@ function App() {
   };
 
   const handleLaunchServer = async (server: ServerInfo) => {
+    useSessionStore.getState().setLaunchState('launching');
     try {
       await launcherApi.launchServer(server.id);
+      // Launch initiated successfully - game is now running
+      useSessionStore.getState().setLaunchState('running');
     } catch (err) {
       console.error('Failed to launch game:', err);
+      useSessionStore.getState().setLaunchState('error');
+      useSessionStore.getState().setLastError(String(err));
     }
   };
 
