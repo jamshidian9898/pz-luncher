@@ -180,7 +180,75 @@ test-stack-status:
 	@echo "=== Agent Status ==="
 	@curl -s http://localhost:8080/api/v1/agents | python3 -m json.tool 2>/dev/null || echo "(backend not ready)"
 
-# --- VM Test Environment (Vagrant + VMware/VirtualBox) ---
+# --- Vagrant Windows Development VM ---
+# Quick Windows 11 VM with full dev environment
+# Requires: VirtualBox + Vagrant
+
+.PHONY: vagrant-help vagrant-up vagrant-down vagrant-reload vagrant-ssh vagrant-rdp vagrant-build vagrant-destroy vagrant-snapshot-save vagrant-snapshot-restore
+
+vagrant-help:
+	@echo "Vagrant Windows Dev VM Commands:"
+	@echo "  make vagrant-up              - Create and start Windows VM"
+	@echo "  make vagrant-down            - Stop VM (keep files)"
+	@echo "  make vagrant-reload          - Restart VM (apply Vagrantfile changes)"
+	@echo "  make vagrant-rdp             - Connect via RDP"
+	@echo "  make vagrant-ssh             - SSH/PowerShell into VM"
+	@echo "  make vagrant-build           - Build PZ launcher inside VM"
+	@echo "  make vagrant-build-windows   - Cross-compile Windows binary from host"
+	@echo "  make vagrant-destroy         - Delete VM completely"
+	@echo "  make vagrant-snapshot-save   - Save VM snapshot"
+	@echo "  make vagrant-snapshot-restore - Restore VM snapshot"
+
+vagrant-up:
+	@echo "=== Starting Windows 11 Dev VM ==="
+	@echo "First boot takes ~5-10 minutes (Windows setup + provisioning)"
+	@echo ""
+	vagrant up
+	@echo ""
+	@echo "✅ VM ready! Access:"
+	@echo "  - GUI: VirtualBox window (auto-opens)"
+	@echo "  - RDP: make vagrant-rdp"
+	@echo "  - SSH: make vagrant-ssh"
+
+vagrant-down:
+	vagrant halt
+	@echo "✅ VM stopped (data preserved)"
+
+vagrant-reload:
+	vagrant reload
+
+vagrant-rdp:
+	vagrant rdp
+
+vagrant-ssh:
+	@echo "Connecting to VM PowerShell..."
+	vagrant powershell
+
+vagrant-build:
+	@echo "🔨 Building PZ launcher inside VM..."
+	vagrant powershell -c "cd C:/Users/vagrant/project; go build ./apps/backend/...; cd apps/launcher-ui/frontend; npm ci; npm run build; cd ..; wails build -platform windows -ldflags \"-X main.Version=$(VERSION)\""
+	@echo "✅ Build complete in VM at: C:\Users\vagrant\project\build\"
+
+vagrant-build-windows:
+	@echo "🔨 Building Windows binary (cross-compile from host)..."
+	$(MAKE) build-windows
+
+vagrant-destroy:
+	@echo "⚠️  This will DELETE the VM and all its data!"
+	@read -p "Are you sure? [y/N] " confirm && [ $$confirm = y ] && vagrant destroy -f || echo "Cancelled"
+
+vagrant-snapshot-save:
+	@read -p "Snapshot name: " name; \
+	vagrant snapshot save $$name
+	@echo "✅ Snapshot saved: $$name"
+
+vagrant-snapshot-restore:
+	@vagrant snapshot list
+	@read -p "Snapshot to restore: " name; \
+	vagrant snapshot restore $$name
+	@echo "✅ Snapshot restored: $$name"
+
+# --- Old VM Test Environment (Linux VMs) ---
 # Requires: vagrant, vagrant-vmware-desktop plugin (or VirtualBox)
 
 vm-up:
