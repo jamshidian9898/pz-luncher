@@ -123,6 +123,7 @@ export function ServerBrowser({ onJoin, onLaunch }: ServerBrowserProps) {
                   details={details} 
                   onJoin={() => onJoin(selectedServer)}
                   onLaunch={onLaunch ? () => onLaunch(selectedServer) : undefined}
+                  onManage={() => {/* TODO: Open manage modal */ alert('Manage server: ' + selectedServer.name)}}
                 />
               );
             }
@@ -132,6 +133,7 @@ export function ServerBrowser({ onJoin, onLaunch }: ServerBrowserProps) {
                 server={selectedServer}
                 onJoin={() => onJoin(selectedServer)}
                 onLaunch={onLaunch ? () => onLaunch(selectedServer) : undefined}
+                onManage={() => {/* TODO: Open manage modal */ alert('Manage server: ' + selectedServer.name)}}
               />
             );
           })()
@@ -160,6 +162,8 @@ interface ServerCardProps {
 
 function ServerCard({ server, selected, favorite, onSelect, onFavorite, onJoin, onLaunch }: ServerCardProps) {
   const status = useServerStatus(server.id);
+  const currentServer = useSessionStore(s => s.currentServer);
+  const launchState = useSessionStore(s => s.launchState);
   const fill = server.maxPlayers > 0
     ? Math.round((server.playerCount / server.maxPlayers) * 100)
     : 0;
@@ -168,6 +172,9 @@ function ServerCard({ server, selected, favorite, onSelect, onFavorite, onJoin, 
   const showLaunch = status === 'ready' || status === 'running';
   const isRunning = status === 'running';
   const isDownloading = status === 'downloading';
+  
+  // Check if another server is currently running
+  const isAnotherServerRunning = launchState === 'running' && currentServer?.id !== server.id;
 
   return (
     <div
@@ -234,6 +241,13 @@ function ServerCard({ server, selected, favorite, onSelect, onFavorite, onJoin, 
         >
           <Loader2 size={12} className="animate-spin" /> Downloading
         </button>
+      ) : isAnotherServerRunning ? (
+        <button
+          disabled
+          className="absolute right-3 bottom-3 px-3 py-1 rounded text-xs font-medium bg-slate-700 text-slate-400 cursor-not-allowed flex items-center gap-1"
+        >
+          <Gamepad2 size={12} /> Game Running
+        </button>
       ) : showLaunch && onLaunch ? (
         <button
           onClick={(e) => { e.stopPropagation(); if (!isRunning) onLaunch(); }}
@@ -265,18 +279,19 @@ function ServerCard({ server, selected, favorite, onSelect, onFavorite, onJoin, 
 }
 
 /* ── Detail Panel ── */
-function DetailPanel({ details, onJoin, onLaunch }: { details: ServerDetails; onJoin: () => void; onLaunch?: () => void }) {
-  const totalMB = (details.totalSize / 1024 / 1024).toFixed(0);
+function DetailPanel({ details, onJoin, onLaunch, onManage }: { details: ServerDetails; onJoin: () => void; onLaunch?: () => void; onManage?: () => void }) {
+  const totalMB = ((details.totalSize || 0) / 1024 / 1024).toFixed(0);
   const status = useServerStatus(details.id);
+  const mods = details.mods || [];
 
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-slate-100">{details.name}</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-sm text-slate-400">{details.description}</p>
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold text-slate-100">{details.name || 'Unknown Server'}</h2>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <p className="text-sm text-slate-400">{details.description || 'No description'}</p>
             <StatusBadge status={status} />
           </div>
         </div>
@@ -284,12 +299,13 @@ function DetailPanel({ details, onJoin, onLaunch }: { details: ServerDetails; on
           serverId={details.id}
           onJoin={onJoin}
           onLaunch={onLaunch}
+          onManage={onManage}
         />
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Players"  value={`${details.playerCount} / ${details.maxPlayers}`} />
+        <Stat label="Players"  value={`${details.playerCount || 0} / ${details.maxPlayers || 0}`} />
         <Stat label="Ping"     value={details.ping > 0 ? `${details.ping}ms` : '—'} />
         <Stat label="Download" value={`${totalMB} MB`} />
       </div>
@@ -297,10 +313,10 @@ function DetailPanel({ details, onJoin, onLaunch }: { details: ServerDetails; on
       {/* Mod list */}
       <div>
         <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-          Mods ({details.mods.length})
+          Mods ({mods.length})
         </h3>
         <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-          {details.mods.map(mod => (
+          {mods.map(mod => (
             <div key={mod.id} className="flex items-center justify-between py-1.5 border-b border-slate-700/50 last:border-0">
               <div className="min-w-0">
                 <span className="text-sm text-slate-200 truncate block">{mod.name}</span>
@@ -325,81 +341,144 @@ function DetailPanel({ details, onJoin, onLaunch }: { details: ServerDetails; on
 }
 
 /* ── Server Action Button Helper ── */
-function ServerActionButton({ serverId, onJoin, onLaunch }: { serverId: string; onJoin: () => void; onLaunch?: () => void }) {
+function ServerActionButton({ serverId, onJoin, onLaunch, onManage }: { serverId: string; onJoin: () => void; onLaunch?: () => void; onManage?: () => void }) {
   const status = useServerStatus(serverId);
+  const currentServer = useSessionStore(s => s.currentServer);
+  const launchState = useSessionStore(s => s.launchState);
+  
+  // Check if another server is currently running
+  const isAnotherServerRunning = launchState === 'running' && currentServer?.id !== serverId;
 
   // Downloading state
   if (status === 'downloading') {
     return (
-      <button
-        disabled
-        className="shrink-0 flex items-center gap-2 px-5 py-2 bg-slate-700 text-slate-400 rounded-lg text-sm font-medium cursor-not-allowed"
-      >
-        <Loader2 size={16} className="animate-spin" /> Downloading...
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          disabled
+          className="shrink-0 flex items-center gap-2 px-5 py-2 bg-slate-700 text-slate-400 rounded-lg text-sm font-medium cursor-not-allowed"
+        >
+          <Loader2 size={16} className="animate-spin" /> Downloading...
+        </button>
+        {onManage && (
+          <button
+            onClick={onManage}
+            className="shrink-0 flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm font-medium transition-colors"
+          >
+            Manage
+          </button>
+        )}
+      </div>
     );
   }
 
-  // Running state
+  // Running state - this server is running
   if (status === 'running') {
     return (
-      <button
-        disabled
-        className="shrink-0 flex items-center gap-2 px-5 py-2 bg-slate-700 text-emerald-400 rounded-lg text-sm font-medium cursor-not-allowed"
-      >
-        <Gamepad2 size={16} /> Game Running
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          disabled
+          className="shrink-0 flex items-center gap-2 px-5 py-2 bg-slate-700 text-emerald-400 rounded-lg text-sm font-medium cursor-not-allowed"
+        >
+          <Gamepad2 size={16} /> Playing
+        </button>
+        {onManage && (
+          <button
+            onClick={onManage}
+            className="shrink-0 flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm font-medium transition-colors"
+          >
+            Manage
+          </button>
+        )}
+      </div>
     );
   }
 
   // Ready to launch
   if (status === 'ready' && onLaunch) {
     return (
-      <button
-        onClick={onLaunch}
-        className="shrink-0 flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
-      >
-        <Play size={16} /> Launch Game
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onLaunch}
+          disabled={isAnotherServerRunning}
+          className={`shrink-0 flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+            isAnotherServerRunning
+              ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+              : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+          }`}
+        >
+          <Play size={16} /> {isAnotherServerRunning ? 'Another Game Running' : 'Launch Game'}
+        </button>
+        {onManage && (
+          <button
+            onClick={onManage}
+            className="shrink-0 flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm font-medium transition-colors"
+          >
+            Manage
+          </button>
+        )}
+      </div>
     );
   }
 
   // Needs update
   if (status === 'needs-update') {
     return (
-      <button
-        onClick={onJoin}
-        className="shrink-0 flex items-center gap-2 px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition-colors"
-      >
-        <Download size={16} /> Update Mods
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onJoin}
+          disabled={isAnotherServerRunning}
+          className={`shrink-0 flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+            isAnotherServerRunning
+              ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+              : 'bg-amber-600 hover:bg-amber-500 text-white'
+          }`}
+        >
+          <Download size={16} /> {isAnotherServerRunning ? 'Game Running' : 'Update Mods'}
+        </button>
+        {onManage && (
+          <button
+            onClick={onManage}
+            className="shrink-0 flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm font-medium transition-colors"
+          >
+            Manage
+          </button>
+        )}
+      </div>
     );
   }
 
   // Not joined - default join button
   return (
-    <button
-      onClick={onJoin}
-      className="shrink-0 flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
-    >
-      Join Server
-    </button>
+    <div className="flex items-center gap-2">
+      <button
+        onClick={onJoin}
+        disabled={isAnotherServerRunning}
+        className={`shrink-0 flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+          isAnotherServerRunning
+            ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+            : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+        }`}
+      >
+        {isAnotherServerRunning ? 'Game Running' : 'Join Server'}
+      </button>
+    </div>
   );
 }
 
 /* ── Detail Panel Fallback (when details API fails) ── */
-function DetailPanelFallback({ server, onJoin, onLaunch }: { server: ServerInfo; onJoin: () => void; onLaunch?: () => void }) {
+function DetailPanelFallback({ server, onJoin, onLaunch, onManage }: { server: ServerInfo; onJoin: () => void; onLaunch?: () => void; onManage?: () => void }) {
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-5">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-slate-100">{server.name}</h2>
-          <p className="text-sm text-slate-400 mt-1">{server.description}</p>
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold text-slate-100">{server.name || 'Unknown Server'}</h2>
+          <p className="text-sm text-slate-400 mt-1">{server.description || 'No description available'}</p>
         </div>
         <ServerActionButton
           serverId={server.id}
           onJoin={onJoin}
           onLaunch={onLaunch}
+          onManage={onManage}
         />
       </div>
 
