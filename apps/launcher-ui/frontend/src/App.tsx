@@ -40,6 +40,15 @@ function App() {
   }, [fetchSettings]);
 
   const handleJoinServer = async (server: ServerInfo) => {
+    // Guard: prevent multiple joins while one is in progress
+    const currentSessionId = useSessionStore.getState().currentSessionId;
+    const currentState = useSessionStore.getState().launchState;
+    if (currentSessionId && (currentState === 'resolving' || currentState === 'downloading' || currentState === 'installing')) {
+      // Already joining, just switch to downloads view
+      setCurrentView('downloads');
+      return;
+    }
+
     useSessionStore.getState().resetSession();
     useSessionStore.getState().setCurrentServer(server);
     selectServer(null);
@@ -156,7 +165,10 @@ function App() {
 
         <main className="flex-1 overflow-auto p-6">
           {currentView === 'servers' && (
-            <ServerBrowser onJoin={handleJoinServer} />
+            <ServerBrowser
+              onJoin={handleJoinServer}
+              onLaunch={handleLaunchServer}
+            />
           )}
           
           {currentView === 'downloads' && (

@@ -131,15 +131,25 @@ func (s *ShadowExecutor) GetTelemetry() *TelemetryReport {
 
 // cloneExecution creates a deep copy for shadow comparison
 func cloneExecution(exec *contracts.PackageExecution) *contracts.PackageExecution {
-	// Deep copy ProviderDecision to avoid shared state issues
-	var decisionCopy *contracts.ProviderDecision
-	if exec.ProviderDecision != nil {
-		decisionCopy = &contracts.ProviderDecision{
-			AvailableProviders: exec.ProviderDecision.AvailableProviders,
-			ChosenProvider:     exec.ProviderDecision.ChosenProvider,
-			SelectionReason:    exec.ProviderDecision.SelectionReason,
-			Confidence:         exec.ProviderDecision.Confidence,
-		}
+	// Deep copy ProviderDecision (value type) to avoid shared state issues
+	// Copy attempts slice
+	attemptsCopy := make([]contracts.ProviderAttempt, len(exec.ProviderDecision.Attempts))
+	copy(attemptsCopy, exec.ProviderDecision.Attempts)
+	// Copy fallback chain
+	fallbackCopy := make([]string, len(exec.ProviderDecision.FallbackChain))
+	copy(fallbackCopy, exec.ProviderDecision.FallbackChain)
+
+	decisionCopy := contracts.ProviderDecision{
+		PackageID:       exec.ProviderDecision.PackageID,
+		PackageVersion:  exec.ProviderDecision.PackageVersion,
+		PackageSHA256:   exec.ProviderDecision.PackageSHA256,
+		ChosenProvider:  exec.ProviderDecision.ChosenProvider,
+		Cached:          exec.ProviderDecision.Cached,
+		DecisionAt:      exec.ProviderDecision.DecisionAt,
+		TotalDurationMs: exec.ProviderDecision.TotalDurationMs,
+		FinalReason:     exec.ProviderDecision.FinalReason,
+		Attempts:        attemptsCopy,
+		FallbackChain:   fallbackCopy,
 	}
 
 	return &contracts.PackageExecution{

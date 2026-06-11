@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { ServerInfo, ServerDetails } from '../types';
 import { launcherApi } from '../wails';
+import { useSessionStore } from '../stores/session.store';
 import {
   Monitor, Users, Wifi, Package, ChevronRight,
-  RefreshCw, Star, StarOff, AlertCircle,
+  RefreshCw, Star, StarOff, AlertCircle, Play,
 } from 'lucide-react';
 
 interface ServerBrowserProps {
   onJoin: (server: ServerInfo) => void;
+  onLaunch?: (server: ServerInfo) => void;
 }
 
-export function ServerBrowser({ onJoin }: ServerBrowserProps) {
+export function ServerBrowser({ onJoin, onLaunch }: ServerBrowserProps) {
   const [servers, setServers]       = useState<ServerInfo[]>([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
@@ -97,6 +99,7 @@ export function ServerBrowser({ onJoin }: ServerBrowserProps) {
             onSelect={() => selectServer(server)}
             onFavorite={(e) => toggleFavorite(server.id, e)}
             onJoin={() => onJoin(server)}
+            onLaunch={onLaunch ? () => onLaunch(server) : undefined}
           />
         ))}
       </div>
@@ -135,9 +138,13 @@ interface ServerCardProps {
   onSelect: () => void;
   onFavorite: (e: React.MouseEvent) => void;
   onJoin: () => void;
+  onLaunch?: () => void;
 }
 
-function ServerCard({ server, selected, favorite, onSelect, onFavorite, onJoin }: ServerCardProps) {
+function ServerCard({ server, selected, favorite, onSelect, onFavorite, onJoin, onLaunch }: ServerCardProps) {
+  const currentServer = useSessionStore(s => s.currentServer);
+  const launchState   = useSessionStore(s => s.launchState);
+  const isReadyToLaunch = currentServer?.id === server.id && launchState === 'complete';
   const fill = server.maxPlayers > 0
     ? Math.round((server.playerCount / server.maxPlayers) * 100)
     : 0;
@@ -198,23 +205,36 @@ function ServerCard({ server, selected, favorite, onSelect, onFavorite, onJoin }
         </div>
       </div>
 
-      {/* Join button — appears on hover / select */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onJoin(); }}
-        className={`absolute right-3 bottom-3 px-3 py-1 rounded text-xs font-medium transition-all ${
-          selected
-            ? 'bg-emerald-600 hover:bg-emerald-500 text-white opacity-100'
-            : 'bg-emerald-600 hover:bg-emerald-500 text-white opacity-0 group-hover:opacity-100'
-        }`}
-      >
-        Join
-      </button>
+      {/* Join/Launch button — appears on hover / select */}
+      {isReadyToLaunch && onLaunch ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); onLaunch(); }}
+          className={`absolute right-3 bottom-3 px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 ${
+            selected
+              ? 'bg-emerald-600 hover:bg-emerald-500 text-white opacity-100'
+              : 'bg-emerald-600 hover:bg-emerald-500 text-white opacity-0 group-hover:opacity-100'
+          }`}
+        >
+          <Play size={12} /> Launch
+        </button>
+      ) : (
+        <button
+          onClick={(e) => { e.stopPropagation(); onJoin(); }}
+          className={`absolute right-3 bottom-3 px-3 py-1 rounded text-xs font-medium transition-all ${
+            selected
+              ? 'bg-emerald-600 hover:bg-emerald-500 text-white opacity-100'
+              : 'bg-emerald-600 hover:bg-emerald-500 text-white opacity-0 group-hover:opacity-100'
+          }`}
+        >
+          Join
+        </button>
+      )}
     </div>
   );
 }
 
 /* ── Detail Panel ── */
-function DetailPanel({ details, onJoin }: { details: ServerDetails; onJoin: () => void }) {
+function DetailPanel({ details, onJoin, onLaunch }: { details: ServerDetails; onJoin: () => void; onLaunch?: () => void }) {
   const totalMB = (details.totalSize / 1024 / 1024).toFixed(0);
 
   return (
@@ -225,12 +245,11 @@ function DetailPanel({ details, onJoin }: { details: ServerDetails; onJoin: () =
           <h2 className="text-lg font-bold text-slate-100">{details.name}</h2>
           <p className="text-sm text-slate-400 mt-1">{details.description}</p>
         </div>
-        <button
-          onClick={onJoin}
-          className="shrink-0 flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          Join Server
-        </button>
+        <ServerActionButton
+          serverId={details.id}
+          onJoin={onJoin}
+          onLaunch={onLaunch}
+        />
       </div>
 
       {/* Stats */}
@@ -270,8 +289,34 @@ function DetailPanel({ details, onJoin }: { details: ServerDetails; onJoin: () =
   );
 }
 
+/* ── Server Action Button Helper ── */
+function ServerActionButton({ serverId, onJoin, onLaunch }: { serverId: string; onJoin: () => void; onLaunch?: () => void }) {
+  const currentServer = useSessionStore(s => s.currentServer);
+  const launchState   = useSessionStore(s => s.launchState);
+  const isReadyToLaunch = currentServer?.id === serverId && launchState === 'complete';
+
+  if (isReadyToLaunch && onLaunch) {
+    return (
+      <button
+        onClick={onLaunch}
+        className="shrink-0 flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
+      >
+        <Play size={16} /> Launch Game
+      </button>
+    );
+  }
+  return (
+    <button
+      onClick={onJoin}
+      className="shrink-0 flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
+    >
+      Join Server
+    </button>
+  );
+}
+
 /* ── Detail Panel Fallback (when details API fails) ── */
-function DetailPanelFallback({ server, onJoin }: { server: ServerInfo; onJoin: () => void }) {
+function DetailPanelFallback({ server, onJoin, onLaunch }: { server: ServerInfo; onJoin: () => void; onLaunch?: () => void }) {
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-5">
       <div className="flex items-start justify-between gap-4">
@@ -279,12 +324,11 @@ function DetailPanelFallback({ server, onJoin }: { server: ServerInfo; onJoin: (
           <h2 className="text-lg font-bold text-slate-100">{server.name}</h2>
           <p className="text-sm text-slate-400 mt-1">{server.description}</p>
         </div>
-        <button
-          onClick={onJoin}
-          className="shrink-0 flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          Join Server
-        </button>
+        <ServerActionButton
+          serverId={server.id}
+          onJoin={onJoin}
+          onLaunch={onLaunch}
+        />
       </div>
 
       <div className="grid grid-cols-3 gap-3">
