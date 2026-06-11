@@ -7,13 +7,13 @@ import (
 )
 
 type Config struct {
-	Root          string
-	CacheDir      string
-	ProfilesDir   string
-	SessionsDir   string
-	RegistryPath  string
-	DemoSeedMods  []string // mod ids to seed into cache (offline demo)
-	AutoLaunch    bool
+	Root         string
+	CacheDir     string
+	ProfilesDir  string
+	SessionsDir  string
+	RegistryPath string
+	DemoSeedMods []string // mod ids to seed into cache (offline demo)
+	AutoLaunch   bool
 }
 
 func DefaultConfig(root string) Config {
@@ -53,18 +53,29 @@ func WorkspaceRoot() string {
 	}
 
 	// 3. Production binary: use OS user config directory
-	if configDir, err := os.UserConfigDir(); err == nil {
-		root := filepath.Join(configDir, "PZLauncher")
-		_ = os.MkdirAll(root, 0o755)
-		return root
+	// Try UserConfigDir first, then explicit env vars as fallback
+	configRoot := ""
+	if configDir, err := os.UserConfigDir(); err == nil && configDir != "" {
+		configRoot = configDir
+	} else if appdata := os.Getenv("APPDATA"); appdata != "" {
+		// Windows fallback
+		configRoot = appdata
+	} else if home, err := os.UserHomeDir(); err == nil {
+		// Unix fallback
+		configRoot = filepath.Join(home, ".config")
+	}
+	if configRoot != "" {
+		root := filepath.Join(configRoot, "PZLauncher")
+		if err := os.MkdirAll(root, 0o755); err == nil {
+			return root
+		}
 	}
 
-	// 4. Last resort: exe directory
+	// 4. Last resort: exe directory (NOT cwd — avoids Downloads/Desktop confusion)
 	if exe, err := os.Executable(); err == nil {
 		dir := filepath.Dir(exe)
 		// On macOS .app bundles the real exe is deep inside Contents/MacOS
 		if runtime.GOOS == "darwin" {
-			// Walk up to .app bundle root if inside one
 			for i := 0; i < 5; i++ {
 				if filepath.Ext(dir) == ".app" {
 					dir = filepath.Dir(dir)
@@ -73,6 +84,7 @@ func WorkspaceRoot() string {
 				dir = filepath.Dir(dir)
 			}
 		}
+		_ = os.MkdirAll(filepath.Join(dir, "config"), 0o755)
 		return dir
 	}
 

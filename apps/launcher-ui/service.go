@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -278,7 +279,13 @@ func (s *UIService) backendURL() string {
 	root := s.getWorkspaceRoot()
 	st, _ := settings.Load(root)
 	if st != nil && st.BackendURL != "" {
-		return st.BackendURL
+		u := st.BackendURL
+		// Auto-add http:// if user forgot the scheme
+		if !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
+			u = "http://" + u
+		}
+		// Remove trailing slash
+		return strings.TrimRight(u, "/")
 	}
 	return "http://localhost:8080"
 }
