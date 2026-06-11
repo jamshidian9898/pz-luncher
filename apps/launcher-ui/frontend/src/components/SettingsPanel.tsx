@@ -3,9 +3,10 @@ import { Settings } from '../types';
 import { useSettingsStore } from '../stores/settings.store';
 import { HealthCheck } from './HealthCheck';
 import { DiagnosticsButton } from './DiagnosticsButton';
-import { Folder, Save, RefreshCw, SlidersHorizontal, ShieldCheck } from 'lucide-react';
+import { EventLogPanel } from './EventLogPanel';
+import { Folder, Save, RefreshCw, SlidersHorizontal, ShieldCheck, Activity } from 'lucide-react';
 
-type Tab = 'general' | 'health';
+type Tab = 'general' | 'health' | 'events';
 
 export function SettingsPanel() {
   const settings = useSettingsStore((state) => state.settings);
@@ -42,7 +43,14 @@ export function SettingsPanel() {
       <div className="flex gap-1 p-1 bg-slate-800 rounded-lg w-fit">
         <TabButton icon={<SlidersHorizontal size={14} />} label="General" active={tab === 'general'} onClick={() => setTab('general')} />
         <TabButton icon={<ShieldCheck size={14} />} label="Health Check" active={tab === 'health'} onClick={() => setTab('health')} />
+        <TabButton icon={<Activity size={14} />} label="Event Log" active={tab === 'events'} onClick={() => setTab('events')} />
       </div>
+
+      {tab === 'events' && (
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-5">
+          <EventLogPanel />
+        </div>
+      )}
 
       {tab === 'health' && (
         <div className="space-y-4">
