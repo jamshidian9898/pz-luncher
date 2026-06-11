@@ -78,26 +78,20 @@ export function SessionProgressCard({ onLaunch, onRetry, onRepairCache }: Sessio
       </div>
 
       {/* Step Tracker */}
-      <div className="flex items-center gap-1">
-        {STEPS.map((step, i) => {
+      <div className="space-y-1">
+        {STEPS.map((step) => {
           const status = stepStatus(step, launchState);
           return (
-            <div key={step.id} className="flex items-center flex-1 min-w-0">
-              <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors flex-1 min-w-0 ${
-                status === 'active'  ? 'bg-blue-500/20 text-blue-300' :
-                status === 'done'    ? 'bg-emerald-500/10 text-emerald-400' :
-                status === 'error'   ? 'bg-red-500/10 text-red-400' :
-                                       'text-slate-600'
-              }`}>
-                {status === 'done'   && <CheckCircle size={12} className="shrink-0" />}
-                {status === 'active' && <Loader2 size={12} className="animate-spin shrink-0" />}
-                <span className="truncate">{step.label}</span>
-              </div>
-              {i < STEPS.length - 1 && (
-                <div className={`h-px w-3 shrink-0 mx-0.5 ${
-                  status === 'done' ? 'bg-emerald-500/40' : 'bg-slate-700'
-                }`} />
-              )}
+            <div key={step.id} className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+              status === 'active'  ? 'bg-blue-500/20 text-blue-300' :
+              status === 'done'    ? 'bg-emerald-500/10 text-emerald-400' :
+              status === 'error'   ? 'bg-red-500/10 text-red-400' :
+                                     'text-slate-600'
+            }`}>
+              {status === 'done'    && <CheckCircle size={12} className="shrink-0" />}
+              {status === 'active'  && <Loader2 size={12} className="animate-spin shrink-0" />}
+              {status === 'pending' && <div className="w-3 h-3 shrink-0" />}
+              <span>{step.label}</span>
             </div>
           );
         })}

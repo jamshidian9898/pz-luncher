@@ -148,6 +148,16 @@ export function dispatchLauncherEvent(event: LauncherEvent) {
     return;
   }
 
+  // When a real session.start arrives, remove any optimistic placeholder session
+  if (event.type === 'session.start' && event.sessionId) {
+    const allSessions = useDownloadsStore.getState().sessions;
+    for (const [id] of allSessions) {
+      if (id.startsWith('optimistic-')) {
+        useDownloadsStore.getState().removeSession(id);
+      }
+    }
+  }
+
   // Apply patches
   applyDownloadsPatch(patch.downloads);
   applyTracePatch(event.sessionId, patch.trace, event);

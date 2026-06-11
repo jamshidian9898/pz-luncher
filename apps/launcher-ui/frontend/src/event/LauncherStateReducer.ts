@@ -270,10 +270,11 @@ export function reduceLauncherEvent(
         },
       };
 
-    case LauncherEventType.Error:
+    case LauncherEventType.Error: {
+      const errorSessionId = event.sessionId || session.sessionId;
       return {
         downloads: event.payload?.error
-          ? { failSession: { sessionId: event.sessionId, error: event.payload.error } }
+          ? { failSession: { sessionId: errorSessionId, error: event.payload.error } }
           : undefined,
         session: {
           launchState: 'error',
@@ -291,6 +292,7 @@ export function reduceLauncherEvent(
           ],
         },
       };
+    }
 
     case LauncherEventType.LaunchStateChanged:
       return {
