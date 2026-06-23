@@ -5,6 +5,7 @@ import { DownloadPanel } from './components/DownloadPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { TraceViewer } from './components/TraceViewer';
 import { ContributePanel } from './components/ContributePanel';
+import { CacheManager } from './components/CacheManager';
 import { SessionProgressCard } from './components/SessionProgressCard';
 import { FirstRunWizard } from './components/FirstRunWizard';
 import { useLauncherEvents } from './hooks/useRealEvents';
@@ -14,9 +15,9 @@ import { useSessionStore } from './stores/session.store';
 import { useSettingsStore } from './stores/settings.store';
 import { launcherApi } from './wails';
 import { ServerInfo, Settings } from './types';
-import { Home, Download, Settings as SettingsIcon, Activity, Upload } from 'lucide-react';
+import { Home, Download, Settings as SettingsIcon, Activity, Upload, HardDrive } from 'lucide-react';
 
-type View = 'servers' | 'downloads' | 'settings' | 'trace' | 'contribute';
+type View = 'servers' | 'downloads' | 'settings' | 'trace' | 'contribute' | 'cache';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('servers');
@@ -154,6 +155,12 @@ function App() {
             onClick={() => setCurrentView('contribute')}
           />
           <SidebarButton
+            icon={<HardDrive size={20} />}
+            label="Storage"
+            active={currentView === 'cache'}
+            onClick={() => setCurrentView('cache')}
+          />
+          <SidebarButton
             icon={<SettingsIcon size={20} />}
             label="Settings"
             active={currentView === 'settings'}
@@ -186,6 +193,7 @@ function App() {
             {currentView === 'trace' && 'Session Trace'}
             {currentView === 'settings' && 'Settings'}
             {currentView === 'contribute' && 'Contribute Versions'}
+            {currentView === 'cache' && 'Storage Management'}
           </h2>
         </header>
 
@@ -212,6 +220,10 @@ function App() {
 
           {currentView === 'contribute' && (
             <ContributePanel />
+          )}
+
+          {currentView === 'cache' && (
+            <CacheManager />
           )}
         </main>
       </div>

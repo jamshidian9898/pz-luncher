@@ -96,6 +96,26 @@ export interface SubmitHashResult {
   error?: string;
 }
 
+export interface CacheEntry {
+  type: 'version' | 'mod';
+  key: string;
+  platform?: string;
+  gameVersion?: string;
+  modId?: string;
+  sizeBytes: number;
+  downloadedAt: string;
+  lastUsedAt: string;
+  usedByProfiles: string[];
+}
+
+export interface CacheStats {
+  totalBytes: number;
+  versionBytes: number;
+  modBytes: number;
+  entries: CacheEntry[];
+  deletableBytes: number;
+}
+
 declare global {
   interface Window {
     go: {
@@ -122,6 +142,9 @@ declare global {
           HashGameVersion(localPath: string): Promise<string>;
           SubmitVersionHash(gameId: string, version: string, platform: string, sha256: string, sizeBytes: number): Promise<SubmitHashResult>;
           UploadVersionBinary(gameId: string, version: string, platform: string, localPath: string, sha256: string): Promise<void>;
+          // RFC-0061: Cache Manager
+          GetCacheStats(): Promise<CacheStats>;
+          DeleteCacheEntry(type: 'version' | 'mod', key: string): Promise<void>;
         };
       };
     };
