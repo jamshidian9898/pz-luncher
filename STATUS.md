@@ -12,6 +12,9 @@
 | Decision | [PRODUCT_DECISION.md](PRODUCT_DECISION.md) |
 | 8-week plan | [docs/PRODUCT_ROADMAP.md](docs/PRODUCT_ROADMAP.md) |
 | Domain RFCs | [docs/DOMAIN_RFC_INDEX.md](docs/DOMAIN_RFC_INDEX.md) |
+| Backend Phase A/B | [docs/BACKEND_ROADMAP.md](docs/BACKEND_ROADMAP.md) |
+| Agent Phase B | [docs/AGENT_ROADMAP.md](docs/AGENT_ROADMAP.md) |
+| Breaking changes | [CHANGELOG.md](CHANGELOG.md) |
 | Next spec | [docs/rfc/0030-server-manifest-v1.md](docs/rfc/0030-server-manifest-v1.md) |
 
 ---

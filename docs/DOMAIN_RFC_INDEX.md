@@ -33,6 +33,12 @@
 |-----|-------|--------|
 | [0056](rfc/0056-agent-minimal.md) | Agent Minimal | **Active** |
 
+## Post-MVP (skeleton exists, not required for MVP)
+
+| RFC | Title | Status |
+|-----|-------|--------|
+| [0057](rfc/0057-admin-ui.md) | Admin UI | **Post-MVP — skeleton only** |
+
 ## Launcher Surface Freeze
 
 The Launcher API surface is frozen at:
