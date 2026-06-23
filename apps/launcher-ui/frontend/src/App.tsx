@@ -4,6 +4,7 @@ import { ServerDetail } from './components/ServerDetail';
 import { DownloadPanel } from './components/DownloadPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { TraceViewer } from './components/TraceViewer';
+import { ContributePanel } from './components/ContributePanel';
 import { SessionProgressCard } from './components/SessionProgressCard';
 import { FirstRunWizard } from './components/FirstRunWizard';
 import { useLauncherEvents } from './hooks/useRealEvents';
@@ -13,9 +14,9 @@ import { useSessionStore } from './stores/session.store';
 import { useSettingsStore } from './stores/settings.store';
 import { launcherApi } from './wails';
 import { ServerInfo, Settings } from './types';
-import { Home, Download, Settings as SettingsIcon, Activity } from 'lucide-react';
+import { Home, Download, Settings as SettingsIcon, Activity, Upload } from 'lucide-react';
 
-type View = 'servers' | 'downloads' | 'settings' | 'trace';
+type View = 'servers' | 'downloads' | 'settings' | 'trace' | 'contribute';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('servers');
@@ -146,7 +147,13 @@ function App() {
             active={currentView === 'trace'}
             onClick={() => setCurrentView('trace')}
           />
-          <SidebarButton 
+          <SidebarButton
+            icon={<Upload size={20} />}
+            label="Contribute"
+            active={currentView === 'contribute'}
+            onClick={() => setCurrentView('contribute')}
+          />
+          <SidebarButton
             icon={<SettingsIcon size={20} />}
             label="Settings"
             active={currentView === 'settings'}
@@ -178,6 +185,7 @@ function App() {
             {currentView === 'downloads' && 'Active Downloads'}
             {currentView === 'trace' && 'Session Trace'}
             {currentView === 'settings' && 'Settings'}
+            {currentView === 'contribute' && 'Contribute Versions'}
           </h2>
         </header>
 
@@ -200,6 +208,10 @@ function App() {
           
           {currentView === 'trace' && (
             <TraceViewer />
+          )}
+
+          {currentView === 'contribute' && (
+            <ContributePanel />
           )}
         </main>
       </div>

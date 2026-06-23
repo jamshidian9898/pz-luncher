@@ -72,6 +72,30 @@ export interface Progress {
   eta?: number;
 }
 
+export interface ContributeEntry {
+  gameVersion: string;
+  platform: string;
+  localPath: string;
+  sizeBytes: number;
+  sha256?: string;
+  trustLevel: string;
+  uploadCount: number;
+  source: 'cache' | 'gamePath';
+}
+
+export interface ContributeStatus {
+  entries: ContributeEntry[];
+  backendUrl: string;
+}
+
+export interface SubmitHashResult {
+  status: string;
+  trustLevel: string;
+  uploadCount: number;
+  uploadUrl?: string;
+  error?: string;
+}
+
 declare global {
   interface Window {
     go: {
@@ -93,6 +117,11 @@ declare global {
           }>;
           GetSettings(): Promise<Settings>;
           SaveSettings(settings: Settings): Promise<void>;
+          // RFC-0060: Community Upload
+          GetContributeStatus(): Promise<ContributeStatus>;
+          HashGameVersion(localPath: string): Promise<string>;
+          SubmitVersionHash(gameId: string, version: string, platform: string, sha256: string, sizeBytes: number): Promise<SubmitHashResult>;
+          UploadVersionBinary(gameId: string, version: string, platform: string, localPath: string, sha256: string): Promise<void>;
         };
       };
     };
