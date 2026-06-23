@@ -13,6 +13,7 @@ import (
 
 	"pzlauncher/apps/backend/internal/api"
 	"pzlauncher/apps/backend/internal/auth"
+	"pzlauncher/apps/backend/internal/content"
 	"pzlauncher/apps/backend/internal/obs"
 	"pzlauncher/apps/backend/internal/registry"
 	"pzlauncher/apps/backend/internal/storage"
@@ -22,6 +23,7 @@ func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	registryFile := flag.String("registry", "apps/backend/registry.json", "path to registry.json")
 	storeDir := flag.String("store", "apps/backend/store", "content-addressable blob store directory")
+	contentFile := flag.String("content-registry", "apps/backend/content-registry.json", "path to content registry metadata file (RFC-0059)")
 	fixturesDir := flag.String("fixtures", "fixtures", "fixtures root for demo blob seeding")
 	deployDir := flag.String("deploy", "", "directory to serve under /releases/ and /install-agent.sh (optional)")
 	noAuth := flag.Bool("no-auth", false, "disable agent token auth (dev/test only)")
@@ -50,7 +52,16 @@ func main() {
 		tokens = auth.NewStore()
 	}
 
-	mux := api.NewRouter(reg, baseURL, store, tokens)
+	contentReg, err := content.NewRegistry(*contentFile, content.DefaultThreshold)
+	if err != nil {
+		obs.LogError(context.Background(), "content_registry.load_failed",
+			"path", *contentFile, "error", err,
+			"msg", "starting with empty content registry",
+		)
+		contentReg, _ = content.NewRegistry("", content.DefaultThreshold)
+	}
+
+	mux := api.NewRouter(reg, baseURL, store, tokens, contentReg)
 
 	// Serve deploy assets if -deploy is set.
 	// GET /install-agent.sh  → deploy/install-agent.sh

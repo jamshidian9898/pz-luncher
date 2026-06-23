@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"pzlauncher/apps/backend/internal/auth"
+	"pzlauncher/apps/backend/internal/content"
 	"pzlauncher/apps/backend/internal/join"
 	"pzlauncher/apps/backend/internal/metrics"
 	"pzlauncher/apps/backend/internal/obs"
@@ -24,8 +25,11 @@ import (
 // baseURL is the public base URL of this Backend instance (e.g. "http://localhost:8080").
 // store is the content-addressable blob store; may be nil (download will 503).
 // tokens is the agent auth store; may be nil (auth disabled — dev only).
-func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, tokens *auth.Store) http.Handler {
+// contentReg is the Content Registry (RFC-0059); may be nil (registry routes disabled).
+func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, tokens *auth.Store, contentReg *content.Registry) http.Handler {
 	mux := http.NewServeMux()
+
+	registerRegistryRoutes(mux, store, contentReg)
 
 	agentAuth := requireAgentToken(tokens)
 
@@ -374,6 +378,10 @@ type errorEnvelope struct {
 type errorBody struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+}
+
+func decodeJSON(r *http.Request, v interface{}) error {
+	return json.NewDecoder(r.Body).Decode(v)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

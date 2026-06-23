@@ -89,3 +89,26 @@ func UpdateAgentGauges(online, degraded, offline int) {
 	AgentsDegraded.Set(float64(degraded))
 	AgentsOffline.Set(float64(offline))
 }
+
+// Content Registry metrics (RFC-0059)
+var (
+	RegistrySubmitTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "pz_registry_submit_total",
+		Help: "Total community hash submissions, partitioned by game, version, and result status.",
+	}, []string{"game", "version", "status"})
+
+	RegistryUploadTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "pz_registry_upload_total",
+		Help: "Total binary uploads to the content registry.",
+	}, []string{"game", "version", "platform"})
+
+	RegistryUploadBytes = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pz_registry_upload_bytes_total",
+		Help: "Total bytes received via registry binary uploads.",
+	})
+
+	RegistryDownloadTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "pz_registry_download_total",
+		Help: "Total binary downloads served from the content registry.",
+	}, []string{"game", "version", "platform"})
+)
