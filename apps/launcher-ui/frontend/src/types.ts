@@ -116,6 +116,31 @@ export interface CacheStats {
   deletableBytes: number;
 }
 
+export interface VersionSource {
+  type: 'registry' | 'agent' | 'hoster';
+  url: string;
+  trustLevel: string;
+  description: string;
+}
+
+export interface VersionCandidate {
+  gameVersion: string;
+  platform: string;
+  sizeBytes: number;
+  trustLevel: string;
+  availableSources: VersionSource[];
+  isLocal: boolean;
+  localPath?: string;
+}
+
+export interface VersionSelector {
+  required: string;
+  localVersion?: string;
+  candidates: VersionCandidate[];
+  needDownload: boolean;
+  autoSelected?: VersionSource;
+}
+
 declare global {
   interface Window {
     go: {
@@ -145,6 +170,9 @@ declare global {
           // RFC-0061: Cache Manager
           GetCacheStats(): Promise<CacheStats>;
           DeleteCacheEntry(type: 'version' | 'mod', key: string): Promise<void>;
+          // RFC-0062: Game Version Selection
+          GetVersionSelector(requiredVersion: string): Promise<VersionSelector>;
+          ConfirmVersionDownload(gameVersion: string, platform: string, sourceUrl: string): Promise<void>;
         };
       };
     };
