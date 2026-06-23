@@ -33,6 +33,26 @@
 |-----|-------|--------|
 | [0056](rfc/0056-agent-minimal.md) | Agent Minimal | **Active** |
 
+## Phase C — Game Version Management & Content Registry (v2.1.0)
+
+> مشکل: سرورهای ایرانی و بین‌المللی روی نسخه‌های قدیمی قفل می‌کنن.  
+> Steam قابل دسترس نیست. بازیکن باید بدون Steam نسخه درست رو داشته باشه.
+
+| RFC | Title | Status |
+|-----|-------|--------|
+| [0058](rfc/0058-game-version-management.md) | Game Version Management | **Active** |
+| [0059](rfc/0059-content-registry.md) | Content Registry | **Active** |
+| [0060](rfc/0060-community-upload.md) | Community Upload & Cross-Validation | **Active** |
+| [0061](rfc/0061-cache-manager.md) | Cache Manager | **Active** |
+
+**Build order (Phase C)**:
+1. RFC-0059 — Content Registry API + storage
+2. RFC-0060 — Community upload flow + cross-validation
+3. RFC-0058 — Launcher version management + download flow
+4. RFC-0061 — Cache Manager UI
+
+---
+
 ## Post-MVP (skeleton exists, not required for MVP)
 
 | RFC | Title | Status |
