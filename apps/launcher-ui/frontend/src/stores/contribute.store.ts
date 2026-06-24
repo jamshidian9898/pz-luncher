@@ -83,10 +83,13 @@ export const useContributeStore = create<ContributeStore>((set, get) => ({
 
     // Step 1: Hash the binary if we don't already have a SHA256
     let sha256 = entry.sha256 ?? '';
+    let sizeBytes = entry.sizeBytes;
     if (!sha256) {
       setProgress(version, { state: 'hashing', percent: 0 });
       try {
-        sha256 = await window.go.main.App.HashGameVersion(entry.localPath);
+        const hashResult = await window.go.main.App.HashGameVersion(entry.localPath);
+        sha256 = hashResult.sha256;
+        sizeBytes = hashResult.sizeBytes;
       } catch (e) {
         setProgress(version, { state: 'error', error: String(e) });
         return;
@@ -98,7 +101,7 @@ export const useContributeStore = create<ContributeStore>((set, get) => ({
     let submitResult;
     try {
       submitResult = await window.go.main.App.SubmitVersionHash(
-        'pz', entry.gameVersion, entry.platform, sha256, entry.sizeBytes
+        'pz', entry.gameVersion, entry.platform, sha256, sizeBytes
       );
     } catch (e) {
       setProgress(version, { state: 'error', error: String(e) });
@@ -115,7 +118,7 @@ export const useContributeStore = create<ContributeStore>((set, get) => ({
       setProgress(version, { state: 'upload_required', percent: 0 });
       try {
         await window.go.main.App.UploadVersionBinary(
-          'pz', entry.gameVersion, entry.platform, entry.localPath, sha256
+          'pz', entry.gameVersion, entry.platform, entry.localPath, sha256, sizeBytes
         );
       } catch (e) {
         setProgress(version, { state: 'error', error: String(e) });

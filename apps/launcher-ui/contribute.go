@@ -6,6 +6,7 @@ package main
 // contribute game client binaries to the Content Registry.
 
 import (
+	"archive/zip"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -14,7 +15,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -29,8 +32,8 @@ type ContributeEntry struct {
 	Platform    string `json:"platform"`
 	LocalPath   string `json:"localPath"`
 	SizeBytes   int64  `json:"sizeBytes"`
-	SHA256      string `json:"sha256,omitempty"`    // populated after hashing
-	TrustLevel  string `json:"trustLevel"`          // "unknown"|"pending"|"verified"|"rejected"
+	SHA256      string `json:"sha256,omitempty"` // populated after hashing
+	TrustLevel  string `json:"trustLevel"`       // "unknown"|"pending"|"verified"|"rejected"
 	UploadCount int    `json:"uploadCount"`
 	Source      string `json:"source"` // "cache"|"gamePath"
 }
@@ -106,17 +109,34 @@ func (a *App) GetContributeStatus() (*ContributeStatus, error) {
 	return &ContributeStatus{Entries: entries, BackendURL: backendURL}, nil
 }
 
-// HashGameVersion computes the SHA256 of the game binary archive for a given entry.
-// This is a slow operation for large files (~3 GB); progress events are emitted.
-func (a *App) HashGameVersion(localPath string) (string, error) {
+// HashResult is returned by HashGameVersion.
+type HashResult struct {
+	SHA256    string `json:"sha256"`
+	SizeBytes int64  `json:"sizeBytes"`
+}
+
+// HashGameVersion computes the SHA256 of the game binary for a given entry.
+// It accepts either a single file or a directory. Directories are packed into a
+// deterministic zip archive so the same hash is produced for identical content.
+// This is a slow operation for large files (~10 GB); progress events are emitted.
+func (a *App) HashGameVersion(localPath string) (*HashResult, error) {
+	info, err := os.Stat(localPath)
+	if err != nil {
+		return nil, fmt.Errorf("cannot stat %q: %w", localPath, err)
+	}
+
+	if info.IsDir() {
+		return a.hashGameDirectory(localPath)
+	}
+	return a.hashGameFile(localPath, info.Size())
+}
+
+func (a *App) hashGameFile(localPath string, total int64) (*HashResult, error) {
 	f, err := os.Open(localPath)
 	if err != nil {
-		return "", fmt.Errorf("cannot open %q: %w", localPath, err)
+		return nil, fmt.Errorf("cannot open %q: %w", localPath, err)
 	}
 	defer f.Close()
-
-	stat, _ := f.Stat()
-	total := stat.Size()
 
 	h := sha256.New()
 	buf := make([]byte, 4*1024*1024) // 4 MB chunks
@@ -142,11 +162,139 @@ func (a *App) HashGameVersion(localPath string) (string, error) {
 			break
 		}
 		if err != nil {
-			return "", fmt.Errorf("hash read error: %w", err)
+			return nil, fmt.Errorf("hash read error: %w", err)
 		}
 	}
 	a.emitContributeEvent("hashing", map[string]interface{}{"percent": 100, "done": done, "total": total})
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return &HashResult{
+		SHA256:    hex.EncodeToString(h.Sum(nil)),
+		SizeBytes: total,
+	}, nil
+}
+
+func (a *App) hashGameDirectory(localPath string) (*HashResult, error) {
+	h := sha256.New()
+	cw := &countingWriter{w: h}
+
+	// Size is not known until the archive is written; emit a streaming progress
+	// event based on the number of files processed.
+	fileCount, totalFiles, err := countFiles(localPath)
+	if err != nil {
+		return nil, fmt.Errorf("cannot count directory files: %w", err)
+	}
+	_ = fileCount
+
+	var processed int
+	lastEmit := time.Now()
+	emitProgress := func() {
+		if time.Since(lastEmit) > 500*time.Millisecond {
+			pct := 0
+			if totalFiles > 0 {
+				pct = int(float64(processed) / float64(totalFiles) * 100)
+			}
+			a.emitContributeEvent("hashing", map[string]interface{}{
+				"percent": pct,
+				"done":    processed,
+				"total":   totalFiles,
+			})
+			lastEmit = time.Now()
+		}
+	}
+
+	if err := writeDeterministicZip(cw, localPath, func() {
+		processed++
+		emitProgress()
+	}); err != nil {
+		return nil, fmt.Errorf("hash archive error: %w", err)
+	}
+	a.emitContributeEvent("hashing", map[string]interface{}{"percent": 100, "done": processed, "total": totalFiles})
+	return &HashResult{
+		SHA256:    hex.EncodeToString(h.Sum(nil)),
+		SizeBytes: cw.n,
+	}, nil
+}
+
+// countFiles returns the total number of regular files in a directory tree.
+func countFiles(root string) (int, int, error) {
+	var count int
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info != nil && !info.IsDir() {
+			count++
+		}
+		return nil
+	})
+	return count, count, err
+}
+
+// countingWriter counts bytes written to an underlying writer.
+type countingWriter struct {
+	w io.Writer
+	n int64
+}
+
+func (cw *countingWriter) Write(p []byte) (int, error) {
+	n, err := cw.w.Write(p)
+	cw.n += int64(n)
+	return n, err
+}
+
+// writeDeterministicZip packs root into a zip archive with deterministic ordering
+// and fixed metadata, so the same directory always produces the same byte stream.
+// onFile is called after each file is added.
+func writeDeterministicZip(w io.Writer, root string, onFile func()) error {
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+
+	var entries []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		entries = append(entries, rel)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	sort.Strings(entries)
+	fixedTime := time.Unix(0, 0)
+
+	for _, rel := range entries {
+		full := filepath.Join(root, rel)
+		header := &zip.FileHeader{
+			Name:     filepath.ToSlash(rel),
+			Method:   zip.Store,
+			Modified: fixedTime,
+		}
+		f, err := zw.CreateHeader(header)
+		if err != nil {
+			return err
+		}
+		file, err := os.Open(full)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(f, file)
+		file.Close()
+		if err != nil {
+			return err
+		}
+		if onFile != nil {
+			onFile()
+		}
+	}
+	return zw.Close()
 }
 
 // SubmitVersionHash calls POST /api/v1/registry/versions/{g}/{v}/{p}/submit.
@@ -178,7 +326,7 @@ func (a *App) SubmitVersionHash(gameID, version, platform, sha256hex string, siz
 
 // UploadVersionBinary streams the local file to the registry.
 // Emits progress events during upload.
-func (a *App) UploadVersionBinary(gameID, version, platform, localPath, sha256hex string) error {
+func (a *App) UploadVersionBinary(gameID, version, platform, localPath, sha256hex string, sizeBytes int64) error {
 	root := a.ui.getWorkspaceRoot()
 	st, _ := settings.Load(root)
 	backendURL := "http://localhost:8080"
@@ -186,20 +334,49 @@ func (a *App) UploadVersionBinary(gameID, version, platform, localPath, sha256he
 		backendURL = st.BackendURL
 	}
 
-	f, err := os.Open(localPath)
+	info, err := os.Stat(localPath)
 	if err != nil {
-		return fmt.Errorf("cannot open %q: %w", localPath, err)
+		return fmt.Errorf("cannot stat %q: %w", localPath, err)
 	}
-	defer f.Close()
 
-	stat, _ := f.Stat()
-	total := stat.Size()
+	var body io.Reader
+	var total int64
+
+	if info.IsDir() {
+		if sizeBytes <= 0 {
+			return fmt.Errorf("directory upload requires a known archive size; hash the directory first")
+		}
+		pr, pw := io.Pipe()
+		go func() {
+			defer pw.Close()
+			if err := writeDeterministicZip(pw, localPath, nil); err != nil {
+				_ = pw.CloseWithError(err)
+			}
+		}()
+		body = pr
+		total = sizeBytes
+	} else {
+		f, err := os.Open(localPath)
+		if err != nil {
+			return fmt.Errorf("cannot open %q: %w", localPath, err)
+		}
+		defer f.Close()
+		body = f
+		if sizeBytes > 0 {
+			total = sizeBytes
+		} else {
+			total = info.Size()
+		}
+	}
 
 	pr := &progressReader{
-		r:     f,
+		r:     body,
 		total: total,
 		onProgress: func(done int64) {
-			pct := int(float64(done) / float64(total) * 100)
+			pct := 0
+			if total > 0 {
+				pct = int(float64(done) / float64(total) * 100)
+			}
 			a.emitContributeEvent("uploading", map[string]interface{}{
 				"percent": pct,
 				"done":    done,
@@ -292,14 +469,7 @@ func entryFromGamePath(gamePath string) (ContributeEntry, error) {
 	if _, err := os.Stat(gamePath); err != nil {
 		return ContributeEntry{}, err
 	}
-	// Try to read version from a version hint file placed by our launcher.
-	metaPath := filepath.Join(gamePath, ".pz-version")
-	var version string
-	if data, err := os.ReadFile(metaPath); err == nil {
-		version = strings.TrimSpace(string(data))
-	} else {
-		version = "unknown"
-	}
+	version := detectGameVersion(gamePath)
 	size, _ := dirSize(gamePath)
 	return ContributeEntry{
 		GameVersion: version,
@@ -309,6 +479,54 @@ func entryFromGamePath(gamePath string) (ContributeEntry, error) {
 		TrustLevel:  "unknown",
 		Source:      "gamePath",
 	}, nil
+}
+
+// detectGameVersion tries several heuristics to determine a game version from a path.
+func detectGameVersion(gamePath string) string {
+	// 1. Version hint file placed by our launcher.
+	if data, err := os.ReadFile(filepath.Join(gamePath, ".pz-version")); err == nil {
+		if v := strings.TrimSpace(string(data)); v != "" {
+			return v
+		}
+	}
+
+	// 2. Generic version file inside the directory.
+	if data, err := os.ReadFile(filepath.Join(gamePath, "version.txt")); err == nil {
+		if v := strings.TrimSpace(string(data)); v != "" {
+			return v
+		}
+	}
+
+	// 3. Extract version from directory names in the path (e.g. ProjectZomboid-42.16.3).
+	parts := strings.Split(filepath.ToSlash(gamePath), "/")
+	versionRe := regexp.MustCompile(`(?i)(?:ProjectZomboid|PZ|ProjectZomboid64)[-_\s]?v?(\d+(?:\.\d+)*\w*)`)
+	for i := len(parts) - 1; i >= 0; i-- {
+		if m := versionRe.FindStringSubmatch(parts[i]); len(m) > 1 {
+			if v := normalizeVersion(m[1]); v != "" {
+				return v
+			}
+		}
+	}
+
+	// 4. Fallback: any path component that looks like a version number.
+	fallbackRe := regexp.MustCompile(`(\d+(?:\.\d+)+\w*)`)
+	for i := len(parts) - 1; i >= 0; i-- {
+		if m := fallbackRe.FindStringSubmatch(parts[i]); len(m) > 1 {
+			if v := normalizeVersion(m[1]); v != "" {
+				return v
+			}
+		}
+	}
+
+	return "unknown"
+}
+
+func normalizeVersion(v string) string {
+	v = strings.TrimSpace(v)
+	if regexp.MustCompile(`^\d+(\.\d+)*$`).MatchString(v) {
+		return v
+	}
+	return ""
 }
 
 func enrichFromRegistry(backendURL string, entry *ContributeEntry) {

@@ -39,7 +39,6 @@ func NewService(cfg Config) *Service {
 
 func (s *Service) RunJoin(ctx context.Context, serverID string, emit Emitter) (*JoinResult, error) {
 	sessionID := fmt.Sprintf("session-%d", time.Now().Unix())
-	emit(Event{Type: "session.start", SessionID: sessionID, Metadata: map[string]interface{}{"serverId": serverID}})
 
 	reg, err := manifestv1.LoadRegistry(s.cfg.RegistryPath)
 	if err != nil {
@@ -60,6 +59,12 @@ func (s *Service) RunJoin(ctx context.Context, serverID string, emit Emitter) (*
 		emit(Event{Type: "manifest.failed", SessionID: sessionID, Error: err.Error()})
 		return nil, s.fail(emit, sessionID, "PIPELINE_MANIFEST", err)
 	}
+
+	emit(Event{Type: "session.start", SessionID: sessionID, Metadata: map[string]interface{}{
+		"serverId":        serverID,
+		"gameVersion":     manifest.GameVersion,
+		"manifestVersion": manifest.Version,
+	}})
 
 	emit(Event{Type: "mod.resolve.start", SessionID: sessionID})
 	plan, err := modplan.FromManifest(manifest)
@@ -105,7 +110,10 @@ func (s *Service) RunJoin(ctx context.Context, serverID string, emit Emitter) (*
 		if item != nil {
 			item.State = download.StatePending
 		}
-		emit(Event{Type: "download.start", SessionID: sessionID, PackageID: m.ID})
+		emit(Event{Type: "download.start", SessionID: sessionID, PackageID: m.ID, Metadata: map[string]interface{}{
+			"url":       m.DownloadURL,
+			"sizeBytes": m.SizeBytes,
+		}})
 	}
 
 	sessionMgr := session.NewSimpleManager(s.cfg.SessionsDir)

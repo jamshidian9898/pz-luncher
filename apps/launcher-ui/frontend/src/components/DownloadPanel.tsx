@@ -1,6 +1,6 @@
 import { SessionStatus } from '../types';
 import { useSessionStore } from '../stores/session.store';
-import { Download, CheckCircle, Loader2, AlertCircle, Play, Clock, HardDrive, Gamepad2 } from 'lucide-react';
+import { Download, CheckCircle, Loader2, AlertCircle, Play, Clock, HardDrive, Gamepad2, File, Server } from 'lucide-react';
 
 interface DownloadPanelProps {
   sessions: SessionStatus[];
@@ -8,11 +8,11 @@ interface DownloadPanelProps {
 }
 
 export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
-  const launchState   = useSessionStore(s => s.launchState);
+  const launchState = useSessionStore(s => s.launchState);
   const currentServer = useSessionStore(s => s.currentServer);
-  const isComplete    = launchState === 'complete';
-  const isRunning     = launchState === 'running';
-  const isLaunching   = launchState === 'launching';
+  const isComplete = launchState === 'complete';
+  const isRunning = launchState === 'running';
+  const isLaunching = launchState === 'launching';
 
   const activeSessions = sessions.filter(
     s => s.state === 'downloading' || s.state === 'resolving' || s.state === 'installing'
@@ -21,7 +21,9 @@ export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
   const failedSessions = sessions.filter(s => s.state === 'error');
 
   // Calculate total stats
-  const totalProgress = activeSessions.reduce((sum, s) => sum + s.progress, 0) / (activeSessions.length || 1);
+  const totalProgress = activeSessions.length > 0
+    ? activeSessions.reduce((sum, s) => sum + s.progress, 0) / activeSessions.length
+    : 0;
   const totalSpeed = activeSessions.reduce((sum, s) => sum + (s.downloadSpeed || 0), 0);
 
   if (sessions.length === 0 && !currentServer) {
@@ -36,7 +38,7 @@ export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Steam-style Header */}
+      {/* Header */}
       <div className="bg-slate-800/50 border-b border-slate-700 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -44,19 +46,18 @@ export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
               <Download size={20} className="text-blue-400" />
             </div>
             <div>
-              <h2 className="font-semibold text-slate-100">Download Queue</h2>
+              <h2 className="font-semibold text-slate-100">Downloads</h2>
               <p className="text-xs text-slate-400">
-                {activeSessions.length > 0 
+                {activeSessions.length > 0
                   ? `${activeSessions.length} item${activeSessions.length > 1 ? 's' : ''} downloading`
-                  : completedSessions.length > 0 
+                  : completedSessions.length > 0
                     ? `${completedSessions.length} ready to play`
-                    : 'No active downloads'
-                }
+                    : failedSessions.length > 0
+                      ? `${failedSessions.length} failed`
+                      : 'No active downloads'}
               </p>
             </div>
           </div>
-
-          {/* Network Stats */}
           {activeSessions.length > 0 && (
             <div className="flex items-center gap-4 text-xs text-slate-400">
               <div className="flex items-center gap-1.5">
@@ -70,8 +71,6 @@ export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
             </div>
           )}
         </div>
-
-        {/* Global Progress Bar */}
         {activeSessions.length > 0 && (
           <div className="mt-3">
             <div className="w-full bg-slate-700 rounded-full h-1.5">
@@ -84,7 +83,7 @@ export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
         )}
       </div>
 
-      {/* Current Server Status (if any) */}
+      {/* Current Server Status */}
       {currentServer && (
         <div className={`p-4 border-b border-slate-700 ${
           isRunning ? 'bg-emerald-500/10' : isComplete ? 'bg-emerald-900/20' : 'bg-blue-900/20'
@@ -111,13 +110,12 @@ export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
                 </p>
               </div>
             </div>
-
             {(isComplete || isRunning) && onLaunch && (
               <button
                 onClick={onLaunch}
                 disabled={isRunning}
                 className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isRunning 
+                  isRunning
                     ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
                     : 'bg-emerald-600 hover:bg-emerald-500 text-white'
                 }`}
@@ -135,7 +133,6 @@ export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
 
       {/* Download Queue */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
-        {/* Active Downloads */}
         {activeSessions.length > 0 && (
           <div className="space-y-2">
             <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1">
@@ -147,7 +144,6 @@ export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
           </div>
         )}
 
-        {/* Completed */}
         {completedSessions.length > 0 && (
           <div className="space-y-2">
             <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1 mt-6">
@@ -159,7 +155,6 @@ export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
           </div>
         )}
 
-        {/* Failed */}
         {failedSessions.length > 0 && (
           <div className="space-y-2">
             <h4 className="text-xs font-semibold text-red-500 uppercase tracking-wide px-1 mt-6">
@@ -191,19 +186,19 @@ function formatETA(eta?: number): string {
 }
 
 function formatBytes(bytes?: number): string {
-  if (!bytes) return '0 B';
+  if (bytes === undefined || bytes === null) return '0 B';
   if (bytes > 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
   if (bytes > 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   if (bytes > 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${bytes} B`;
 }
 
-// Steam-style Download Row
 function DownloadRow({ session }: { session: SessionStatus }) {
+  const hasSize = session.downloadTotal && session.downloadTotal > 0;
+  const title = session.serverName || session.currentMod || 'Preparing...';
   return (
     <div className="bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-lg p-3 transition-colors">
       <div className="flex items-center gap-3">
-        {/* Icon */}
         <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center shrink-0">
           {session.state === 'downloading' ? (
             <Loader2 size={18} className="text-blue-400 animate-spin" />
@@ -211,48 +206,51 @@ function DownloadRow({ session }: { session: SessionStatus }) {
             <div className="w-4 h-4 rounded-full border-2 border-slate-600 border-t-blue-400 animate-spin" />
           )}
         </div>
-
-        {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            <span className="font-medium text-slate-200 truncate">
-              {session.serverName || session.currentMod || 'Preparing...'}
+            <span className="font-medium text-slate-200 truncate" title={title}>
+              {title}
             </span>
             <span className="text-sm text-slate-400 shrink-0 ml-2">{Math.round(session.progress)}%</span>
           </div>
-
-          {/* Progress Bar */}
-          <div className="w-full bg-slate-700 rounded-full h-1.5 mb-1.5">
+          <div className="w-full bg-slate-700 rounded-full h-2 mb-2">
             <div
-              className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
+              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
               style={{ width: `${session.progress}%` }}
             />
           </div>
-
-          {/* URL */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
+            {session.downloadSpeed ? (
+              <span className="flex items-center gap-1">
+                <HardDrive size={12} />
+                {formatSpeed(session.downloadSpeed)}
+              </span>
+            ) : null}
+            {hasSize ? (
+              <span className="flex items-center gap-1" title="Downloaded size">
+                <File size={12} />
+                {formatBytes(session.downloadCurrent)} / {formatBytes(session.downloadTotal)}
+              </span>
+            ) : null}
+            {session.eta !== undefined && session.eta > 0 ? (
+              <span className="flex items-center gap-1">
+                <Clock size={12} />
+                {formatETA(session.eta)} remaining
+              </span>
+            ) : null}
+            <span className="ml-auto capitalize text-slate-500">{session.state}</span>
+          </div>
           {session.currentModUrl && (
-            <p className="text-xs text-slate-600 break-all" title="Download URL">
+            <p className="text-xs text-slate-600 break-all mt-1.5" title="Download URL">
               {session.currentModUrl}
             </p>
           )}
-
-          {/* Stats */}
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <div className="flex items-center gap-3">
-              <span>{formatSpeed(session.downloadSpeed)}</span>
-              {session.eta !== undefined && session.eta > 0 && (
-                <span className="text-slate-400">{formatETA(session.eta)} remaining</span>
-              )}
-            </div>
-            <span className="capitalize">{session.state}</span>
-          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// Steam-style Completed Row
 function CompletedRow({ session }: { session: SessionStatus }) {
   return (
     <div className="bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/30 rounded-lg p-3 transition-colors">
@@ -267,16 +265,32 @@ function CompletedRow({ session }: { session: SessionStatus }) {
             </span>
             <span className="text-xs text-emerald-400 shrink-0 ml-2">Ready</span>
           </div>
-          {session.serverId && (
-            <p className="text-xs text-slate-500">{session.serverId}</p>
-          )}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-0.5">
+            {session.serverId && (
+              <span className="flex items-center gap-1">
+                <Server size={12} />
+                {session.serverId}
+              </span>
+            )}
+            {session.gameVersion && (
+              <span className="flex items-center gap-1">
+                <Gamepad2 size={12} />
+                Game {session.gameVersion}
+              </span>
+            )}
+            {session.manifestVersion && (
+              <span className="flex items-center gap-1">
+                <File size={12} />
+                Manifest v{session.manifestVersion}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// Steam-style Failed Row
 function FailedRow({ session }: { session: SessionStatus }) {
   const lastError = session.errors?.[session.errors.length - 1] ?? 'Unknown error';
   return (
@@ -292,7 +306,7 @@ function FailedRow({ session }: { session: SessionStatus }) {
             </span>
             <span className="text-xs text-red-400 shrink-0 ml-2">Failed</span>
           </div>
-          <p className="text-xs text-red-400/80 truncate">{lastError}</p>
+          <p className="text-xs text-red-400/80 truncate" title={lastError}>{lastError}</p>
         </div>
       </div>
     </div>

@@ -88,7 +88,11 @@ func (s *Service) RunJoinFromBackend(ctx context.Context, jr BackendJoinResponse
 		sessionID = fmt.Sprintf("session-%d", time.Now().Unix())
 	}
 
-	emit(Event{Type: "session.start", SessionID: sessionID, Metadata: map[string]interface{}{"serverId": serverID}})
+	emit(Event{Type: "session.start", SessionID: sessionID, Metadata: map[string]interface{}{
+		"serverId":        serverID,
+		"gameVersion":     jr.Manifest.GameVersion,
+		"manifestVersion": jr.Manifest.VersionString(),
+	}})
 	emit(Event{Type: "manifest.loaded", SessionID: sessionID, Metadata: map[string]interface{}{
 		"serverId": serverID, "version": jr.Manifest.VersionString(),
 	}})
@@ -108,7 +112,10 @@ func (s *Service) RunJoinFromBackend(ctx context.Context, jr BackendJoinResponse
 		if item.SHA256 == "" || item.URL == "" {
 			continue
 		}
-		emit(Event{Type: "download.start", SessionID: sessionID, PackageID: item.ModID, Metadata: map[string]interface{}{"url": item.URL}})
+		emit(Event{Type: "download.start", SessionID: sessionID, PackageID: item.ModID, Metadata: map[string]interface{}{
+			"url":       item.URL,
+			"sizeBytes": item.SizeBytes,
+		}})
 
 		destPath := filepath.Join(s.cfg.CacheDir, item.SHA256)
 		if _, err := os.Stat(destPath); err == nil {

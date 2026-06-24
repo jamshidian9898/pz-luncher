@@ -58,7 +58,8 @@ export function reduceLauncherEvent(
 
   switch (event.type) {
     case LauncherEventType.SessionStart: {
-      const serverIdFromEvent = event.payload?.metadata?.serverId as string | undefined;
+      const meta = event.payload?.metadata ?? {};
+      const serverIdFromEvent = meta.serverId as string | undefined;
       // Preserve serverName/serverId from optimistic session if it exists
       const serverId = serverIdFromEvent ?? session?.serverId;
       const serverName = session?.serverName;
@@ -68,6 +69,8 @@ export function reduceLauncherEvent(
             ...createSessionStatus(event.sessionId),
             serverId,
             serverName,
+            gameVersion: (meta.gameVersion as string | undefined) ?? session?.gameVersion,
+            manifestVersion: (meta.manifestVersion as string | undefined) ?? session?.manifestVersion,
           },
         },
         session: {
@@ -136,14 +139,18 @@ export function reduceLauncherEvent(
         },
       };
 
-    case LauncherEventType.DownloadStart:
+    case LauncherEventType.DownloadStart: {
+      const meta = event.payload?.metadata ?? {};
+      const sizeBytes = meta.sizeBytes as number | undefined;
       return {
         downloads: {
           sessionUpdate: {
             ...session,
             state: 'downloading',
             currentMod: packageId,
-            currentModUrl: event.payload?.metadata?.url as string | undefined,
+            currentModUrl: meta.url as string | undefined,
+            downloadTotal: sizeBytes,
+            downloadCurrent: 0,
           },
         },
         session: {
@@ -161,6 +168,7 @@ export function reduceLauncherEvent(
           ],
         },
       };
+    }
 
     case LauncherEventType.DownloadProgress:
       if (!progress) {
@@ -176,6 +184,8 @@ export function reduceLauncherEvent(
             currentMod: packageId === 'unknown' ? session.currentMod : packageId,
             downloadSpeed: progress.speed,
             eta: progress.eta,
+            downloadCurrent: progress.current,
+            downloadTotal: progress.total,
           },
         },
         trace: {

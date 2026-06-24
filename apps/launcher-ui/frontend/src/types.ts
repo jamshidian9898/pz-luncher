@@ -46,11 +46,15 @@ export interface SessionStatus {
   progress: number;
   currentMod?: string;
   currentModUrl?: string; // Download URL for the currently active mod
+  downloadTotal?: number; // Total bytes for the current mod download
+  downloadCurrent?: number; // Bytes downloaded so far for the current mod
   downloadSpeed?: number;
   eta?: number;
   errors?: string[];
   serverName?: string; // Associated server name for display
   serverId?: string;   // Associated server ID
+  gameVersion?: string; // Required game version from the server manifest
+  manifestVersion?: string; // Server manifest version
 }
 
 /** UI settings — maps to LauncherSettings via settingsToLauncher */
@@ -87,6 +91,11 @@ export interface ContributeEntry {
 export interface ContributeStatus {
   entries: ContributeEntry[];
   backendUrl: string;
+}
+
+export interface HashResult {
+  sha256: string;
+  sizeBytes: number;
 }
 
 export interface SubmitHashResult {
@@ -165,9 +174,9 @@ declare global {
           SaveSettings(settings: Settings): Promise<void>;
           // RFC-0060: Community Upload
           GetContributeStatus(): Promise<ContributeStatus>;
-          HashGameVersion(localPath: string): Promise<string>;
+          HashGameVersion(localPath: string): Promise<HashResult>;
           SubmitVersionHash(gameId: string, version: string, platform: string, sha256: string, sizeBytes: number): Promise<SubmitHashResult>;
-          UploadVersionBinary(gameId: string, version: string, platform: string, localPath: string, sha256: string): Promise<void>;
+          UploadVersionBinary(gameId: string, version: string, platform: string, localPath: string, sha256: string, sizeBytes: number): Promise<void>;
           // RFC-0061: Cache Manager
           GetCacheStats(): Promise<CacheStats>;
           DeleteCacheEntry(type: 'version' | 'mod', key: string): Promise<void>;
