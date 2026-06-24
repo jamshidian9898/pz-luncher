@@ -54,8 +54,8 @@ func submissionKey(sha256 string) string {
 
 // persistedState is the JSON structure written to disk.
 type persistedState struct {
-	Records     []*ContentRecord      `json:"records"`
-	Submissions map[string][]string   `json:"submissions"` // sha256 → []subnet
+	Records     []*ContentRecord    `json:"records"`
+	Submissions map[string][]string `json:"submissions"` // sha256 → []subnet
 }
 
 // Registry holds all content records in memory and persists them to a JSON file.
@@ -87,7 +87,7 @@ func NewRegistry(dataPath string, threshold int) (*Registry, error) {
 
 // SubmitResult is returned from Submit.
 type SubmitResult struct {
-	Status      string     // "upload_required" | "counted" | "already_stored"
+	Status      string // "upload_required" | "counted" | "already_stored"
 	TrustLevel  TrustLevel
 	UploadCount int
 	Conflict    bool // true when a different SHA256 already exists for this version+platform
@@ -125,13 +125,14 @@ func (r *Registry) Submit(gameID, gameVersion, platform, sha256hex string, sizeB
 			Platform:        platform,
 			SizeBytes:       sizeBytes,
 			TrustLevel:      TrustPending,
-			UploadCount:     0,
 			FirstUploadedAt: now,
 		}
 		r.records[key] = rec
 		r.addSubmitter(sha256hex, subnet)
+		count := len(r.submissions[submissionKey(sha256hex)])
+		rec.UploadCount = count
 		_ = r.persist()
-		return SubmitResult{Status: "upload_required", TrustLevel: TrustPending, UploadCount: 0}
+		return SubmitResult{Status: "upload_required", TrustLevel: TrustPending, UploadCount: count}
 	}
 
 	// Same hash as existing record.

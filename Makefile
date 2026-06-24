@@ -15,7 +15,7 @@ contracts:
 	go run ./tools/gencontracts
 
 test:
-	go test ./libs/...
+	go test ./libs/... ./apps/backend/... ./apps/launcher-core/... ./apps/join-cli/... ./apps/dev-api/... ./apps/pz-agent/...
 
 join:
 	go run ./apps/join-cli -server=demo-survival

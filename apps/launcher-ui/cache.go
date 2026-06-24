@@ -13,14 +13,14 @@ import (
 )
 
 type CacheEntry struct {
-	Type         string `json:"type"` // "version" or "mod"
-	Key          string `json:"key"`
-	Platform     string `json:"platform,omitempty"`
-	GameVersion  string `json:"gameVersion,omitempty"`
-	ModID        string `json:"modId,omitempty"`
-	SizeBytes    int64  `json:"sizeBytes"`
-	DownloadedAt string `json:"downloadedAt"`
-	LastUsedAt   string `json:"lastUsedAt"`
+	Type           string   `json:"type"` // "version" or "mod"
+	Key            string   `json:"key"`
+	Platform       string   `json:"platform,omitempty"`
+	GameVersion    string   `json:"gameVersion,omitempty"`
+	ModID          string   `json:"modId,omitempty"`
+	SizeBytes      int64    `json:"sizeBytes"`
+	DownloadedAt   string   `json:"downloadedAt"`
+	LastUsedAt     string   `json:"lastUsedAt"`
 	UsedByProfiles []string `json:"usedByProfiles"`
 }
 
@@ -51,12 +51,12 @@ func (a *App) GetCacheStats() (*CacheStats, error) {
 			size, _ := dirSize(versionDir)
 
 			entry := CacheEntry{
-				Type:        "version",
-				Key:         d.Name(),
-				GameVersion: d.Name(),
-				SizeBytes:   size,
+				Type:         "version",
+				Key:          d.Name(),
+				GameVersion:  d.Name(),
+				SizeBytes:    size,
 				DownloadedAt: fileModTime(versionDir),
-				LastUsedAt:  fileModTime(versionDir),
+				LastUsedAt:   fileModTime(versionDir),
 			}
 
 			// Check which profiles use this version
@@ -78,12 +78,12 @@ func (a *App) GetCacheStats() (*CacheStats, error) {
 			size, _ := dirSize(modDir)
 
 			entry := CacheEntry{
-				Type:        "mod",
-				Key:         d.Name(),
-				ModID:       d.Name(),
-				SizeBytes:   size,
+				Type:         "mod",
+				Key:          d.Name(),
+				ModID:        d.Name(),
+				SizeBytes:    size,
 				DownloadedAt: fileModTime(modDir),
-				LastUsedAt:  fileModTime(modDir),
+				LastUsedAt:   fileModTime(modDir),
 			}
 
 			entry.UsedByProfiles = modsUsedBy(root, d.Name())
@@ -134,6 +134,10 @@ func (a *App) DeleteCacheEntry(entryType, key string) error {
 
 	if len(profiles) > 0 {
 		return fmt.Errorf("cannot delete: used by profiles: %v", profiles)
+	}
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return fmt.Errorf("cache entry not found: %s/%s", entryType, key)
 	}
 
 	if err := os.RemoveAll(dir); err != nil {

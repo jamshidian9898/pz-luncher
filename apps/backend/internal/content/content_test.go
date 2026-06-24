@@ -1,7 +1,6 @@
 package content
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -28,8 +27,8 @@ func TestSubmit_NewHash(t *testing.T) {
 	if result.TrustLevel != TrustPending {
 		t.Errorf("expected pending, got %s", result.TrustLevel)
 	}
-	if result.UploadCount != 0 {
-		t.Errorf("expected 0 uploads, got %d", result.UploadCount)
+	if result.UploadCount != 1 {
+		t.Errorf("expected 1 unique submitter after first submission, got %d", result.UploadCount)
 	}
 }
 
