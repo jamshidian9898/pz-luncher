@@ -29,7 +29,9 @@ jobs:
           go-version: '1.23'
           cache: true
       - name: Run Go tests
-        run: go test -v ./...
+        # apps/launcher-ui embeds frontend/dist at compile time (//go:embed all:frontend/dist)
+        # which requires a prior npm build — exclude it and test libs + non-Wails apps only.
+        run: go test -v ./libs/... ./apps/launcher-core/...
 
       - uses: actions/setup-node@v4
         with:
