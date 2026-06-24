@@ -101,6 +101,13 @@ function App() {
     }
   };
 
+  const handleLaunchServerById = async (serverId: string) => {
+    const server = useServersStore.getState().servers.find(s => s.id === serverId);
+    if (!server) return;
+    useSessionStore.getState().setCurrentServer(server);
+    await handleLaunchServer(server);
+  };
+
   const handleStopGame = async () => {
     try {
       await launcherApi.stopGame();
@@ -208,7 +215,7 @@ function App() {
           {currentView === 'downloads' && (
             <DownloadPanel
               sessions={Array.from(sessions.values())}
-              onLaunch={canLaunch && currentServer ? () => handleLaunchServer(currentServer) : undefined}
+              onLaunch={handleLaunchServerById}
             />
           )}
           

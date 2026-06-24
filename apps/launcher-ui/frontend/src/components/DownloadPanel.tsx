@@ -4,7 +4,7 @@ import { Download, CheckCircle, Loader2, AlertCircle, Play, Clock, HardDrive, Ga
 
 interface DownloadPanelProps {
   sessions: SessionStatus[];
-  onLaunch?: () => void;
+  onLaunch?: (serverId: string) => void;
 }
 
 export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
@@ -110,9 +110,9 @@ export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
                 </p>
               </div>
             </div>
-            {(isComplete || isRunning) && onLaunch && (
+            {(isComplete || isRunning) && onLaunch && currentServer && (
               <button
-                onClick={onLaunch}
+                onClick={() => onLaunch(currentServer.id)}
                 disabled={isRunning}
                 className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isRunning
@@ -150,7 +150,7 @@ export function DownloadPanel({ sessions, onLaunch }: DownloadPanelProps) {
               Ready to Play ({completedSessions.length})
             </h4>
             {completedSessions.map(session => (
-              <CompletedRow key={session.sessionId} session={session} />
+              <CompletedRow key={session.sessionId} session={session} onLaunch={onLaunch} />
             ))}
           </div>
         )}
@@ -251,7 +251,8 @@ function DownloadRow({ session }: { session: SessionStatus }) {
   );
 }
 
-function CompletedRow({ session }: { session: SessionStatus }) {
+function CompletedRow({ session, onLaunch }: { session: SessionStatus; onLaunch?: (serverId: string) => void }) {
+  const canLaunch = !!onLaunch && !!session.serverId;
   return (
     <div className="bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/30 rounded-lg p-3 transition-colors">
       <div className="flex items-center gap-3">
@@ -263,7 +264,18 @@ function CompletedRow({ session }: { session: SessionStatus }) {
             <span className="font-medium text-slate-200 truncate">
               {session.serverName || `Session ${session.sessionId.slice(-8)}`}
             </span>
-            <span className="text-xs text-emerald-400 shrink-0 ml-2">Ready</span>
+            <div className="flex items-center gap-2 shrink-0 ml-2">
+              <span className="text-xs text-emerald-400">Ready</span>
+              {canLaunch && (
+                <button
+                  onClick={() => onLaunch(session.serverId!)}
+                  className="flex items-center gap-1 px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors"
+                >
+                  <Play size={12} />
+                  Launch
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-0.5">
             {session.serverId && (

@@ -56,10 +56,18 @@ function applyTracePatch(sessionId: string, patch: LauncherEventPatch['trace'], 
 
 function applyDownloadsPatch(patch: LauncherEventPatch['downloads']) {
   const downloadsStore = useDownloadsStore.getState();
+  const serversStore = useServersStore.getState();
   if (!patch) return;
 
   if (patch.sessionUpdate) {
-    downloadsStore.updateSession(patch.sessionUpdate);
+    const update = { ...patch.sessionUpdate };
+    if (update.serverId && !update.serverName) {
+      const server = serversStore.servers.find(s => s.id === update.serverId);
+      if (server) {
+        update.serverName = server.name;
+      }
+    }
+    downloadsStore.updateSession(update);
   }
 
   if (patch.completeSessionId) {
