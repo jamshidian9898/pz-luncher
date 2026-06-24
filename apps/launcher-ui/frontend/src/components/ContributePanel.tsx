@@ -30,7 +30,7 @@ export function ContributePanel() {
     return (
       <div className="flex items-center justify-center h-48 text-slate-400 gap-2">
         <RefreshCw size={16} className="animate-spin" />
-        در حال بررسی نسخه‌های محلی…
+        Scanning local game versions…
       </div>
     );
   }
@@ -41,9 +41,9 @@ export function ContributePanel() {
         <SectionHeader />
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-8 text-center text-slate-400">
           <HelpCircle size={32} className="mx-auto mb-3 opacity-40" />
-          <p className="text-sm">هیچ نسخه‌ای روی این دستگاه پیدا نشد.</p>
+          <p className="text-sm">No game versions found on this device.</p>
           <p className="text-xs mt-1 text-slate-500">
-            مسیر نصب بازی را در تنظیمات وارد کنید.
+            Enter the game installation path in Settings.
           </p>
         </div>
       </div>
@@ -56,10 +56,10 @@ export function ContributePanel() {
 
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-sm text-slate-400 space-y-1">
         <p>
-          با ارسال hash نسخه بازی به تأیید جمعی کمک می‌کنی. نیازی به ثبت‌نام نیست.
+          Submit the game version hash to help community verification. No registration required.
         </p>
         <p className="text-xs text-slate-500">
-          ۳ کاربر مستقل با hash یکسان → <span className="text-emerald-400">Verified ✅</span>
+          3 independent users with the same hash → <span className="text-emerald-400">Verified ✅</span>
         </p>
       </div>
 
@@ -79,7 +79,7 @@ export function ContributePanel() {
         className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
       >
         <RefreshCw size={12} />
-        بروزرسانی وضعیت
+        Refresh status
       </button>
     </div>
   );
@@ -90,10 +90,10 @@ function SectionHeader() {
     <div>
       <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
         <Upload size={18} className="text-emerald-400" />
-        کمک به پایگاه نسخه‌ها
+        Contribute to Version Registry
       </h2>
       <p className="text-sm text-slate-400 mt-1">
-        نسخه‌های بازی که روی این دستگاه داری را برای تأیید جمعی ارسال کن.
+        Send game versions on this device for community verification.
       </p>
     </div>
   );
@@ -115,16 +115,17 @@ function EntryCard({ entry, progress, onContribute }: EntryCardProps) {
     <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 space-y-3">
       {/* Header row */}
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-0.5">
+        <div className="space-y-0.5 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-mono text-sm font-semibold text-slate-100">
-              v{entry.gameVersion}
+              {entry.gameVersion === 'unknown' ? 'Unknown version' : `v${entry.gameVersion}`}
             </span>
             <span className="text-xs text-slate-500">{entry.platform}</span>
             <SourceBadge source={entry.source} />
           </div>
           <div className="flex items-center gap-3 text-xs text-slate-500">
             <span>{formatBytes(entry.sizeBytes)}</span>
+            <span className="truncate max-w-xs" title={entry.localPath}>{entry.localPath}</span>
             <TrustBadge
               trustLevel={done && progress?.submitResult ? progress.submitResult.trustLevel : entry.trustLevel}
               uploadCount={done && progress?.submitResult ? progress.submitResult.uploadCount : entry.uploadCount}
@@ -170,8 +171,8 @@ function EntryCard({ entry, progress, onContribute }: EntryCardProps) {
           <CheckCircle size={12} />
           <span>
             {progress?.submitResult?.status === 'upload_required'
-              ? 'آپلود شد — hash ثبت شد'
-              : 'hash ثبت شد — ممنون از کمکت'}
+              ? 'Uploaded — hash registered'
+              : 'Hash registered — thanks for contributing'}
           </span>
         </div>
       )}
@@ -186,7 +187,7 @@ function ContributeButton({ state, done, busy, onClick }: {
     return (
       <div className="flex items-center gap-1 text-xs text-emerald-400 shrink-0">
         <CheckCircle size={14} />
-        ارسال شد
+        Submitted
       </div>
     );
   }
@@ -205,7 +206,7 @@ function ContributeButton({ state, done, busy, onClick }: {
       ) : (
         <Upload size={12} />
       )}
-      {busy ? stateLabel(state) : 'ارسال'}
+      {busy ? stateLabel(state) : 'Submit'}
     </button>
   );
 }
@@ -215,25 +216,25 @@ function TrustBadge({ trustLevel, uploadCount }: { trustLevel: TrustLevel; uploa
     case 'verified':
       return (
         <span className="flex items-center gap-1 text-emerald-400">
-          <CheckCircle size={11} /> تأییدشده
+          <CheckCircle size={11} /> Verified
         </span>
       );
     case 'pending':
       return (
         <span className="flex items-center gap-1 text-amber-400">
-          <Clock size={11} /> در انتظار ({uploadCount}/3)
+          <Clock size={11} /> Pending ({uploadCount}/3)
         </span>
       );
     case 'rejected':
       return (
         <span className="flex items-center gap-1 text-red-400">
-          <AlertTriangle size={11} /> تعارض hash
+          <AlertTriangle size={11} /> Hash conflict
         </span>
       );
     default:
       return (
         <span className="flex items-center gap-1 text-slate-500">
-          <HelpCircle size={11} /> نامشخص
+          <HelpCircle size={11} /> Unknown
         </span>
       );
   }
@@ -246,17 +247,17 @@ function SourceBadge({ source }: { source: 'cache' | 'gamePath' }) {
         ? 'bg-slate-700 text-slate-400'
         : 'bg-blue-900/40 text-blue-400'
     }`}>
-      {source === 'cache' ? 'cache' : 'نصب اصلی'}
+      {source === 'cache' ? 'cache' : 'Main install'}
     </span>
   );
 }
 
 function stateLabel(state: string): string {
   switch (state) {
-    case 'hashing': return 'محاسبه hash…';
-    case 'submitting': return 'ارسال hash…';
-    case 'upload_required': return 'آماده آپلود…';
-    case 'uploading': return 'در حال آپلود…';
+    case 'hashing': return 'Hashing…';
+    case 'submitting': return 'Submitting hash…';
+    case 'upload_required': return 'Ready to upload…';
+    case 'uploading': return 'Uploading…';
     default: return state;
   }
 }

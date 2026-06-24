@@ -229,6 +229,13 @@ function DownloadRow({ session }: { session: SessionStatus }) {
             />
           </div>
 
+          {/* URL */}
+          {session.currentModUrl && (
+            <p className="text-xs text-slate-600 break-all" title="Download URL">
+              {session.currentModUrl}
+            </p>
+          )}
+
           {/* Stats */}
           <div className="flex items-center justify-between text-xs text-slate-500">
             <div className="flex items-center gap-3">

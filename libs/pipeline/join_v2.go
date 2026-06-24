@@ -108,7 +108,7 @@ func (s *Service) RunJoinFromBackend(ctx context.Context, jr BackendJoinResponse
 		if item.SHA256 == "" || item.URL == "" {
 			continue
 		}
-		emit(Event{Type: "download.start", SessionID: sessionID, PackageID: item.ModID})
+		emit(Event{Type: "download.start", SessionID: sessionID, PackageID: item.ModID, Metadata: map[string]interface{}{"url": item.URL}})
 
 		destPath := filepath.Join(s.cfg.CacheDir, item.SHA256)
 		if _, err := os.Stat(destPath); err == nil {
@@ -193,7 +193,8 @@ func (s *Service) LaunchFromBackend(ctx context.Context, serverID, profilePath s
 		emit(Event{Type: "launch.failed", SessionID: serverID, Error: msg})
 		return fmt.Errorf("launch: %s", msg)
 	}
-	emit(Event{Type: "launch.exited", SessionID: serverID, Metadata: map[string]interface{}{"success": true}})
+	// The process is now running. The UIService game-state polling will emit
+	// launch.exited when the process actually terminates.
 	return nil
 }
 

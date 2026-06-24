@@ -143,6 +143,7 @@ export function reduceLauncherEvent(
             ...session,
             state: 'downloading',
             currentMod: packageId,
+            currentModUrl: event.payload?.metadata?.url as string | undefined,
           },
         },
         session: {

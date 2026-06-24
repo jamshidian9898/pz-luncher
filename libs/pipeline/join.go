@@ -184,7 +184,7 @@ func (s *Service) Launch(ctx context.Context, serverID, profilePath string, emit
 		emit(Event{Type: "launch.failed", SessionID: serverID, Error: msg})
 		return fmt.Errorf("launch: %s", msg)
 	}
-	emit(Event{Type: "launch.exited", SessionID: serverID, Metadata: map[string]interface{}{"success": true}})
+	// Process is running; UIService polling will emit launch.exited on exit.
 	return nil
 }
 

@@ -151,6 +151,8 @@ func mapPipelineEventType(t string) UIEventType {
 		return EventDownloadComplete
 	case "install.complete":
 		return EventInstallComplete
+	case "launch.failed":
+		return EventError
 	case "error":
 		return EventError
 	default:

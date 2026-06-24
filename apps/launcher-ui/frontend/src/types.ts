@@ -45,6 +45,7 @@ export interface SessionStatus {
   state: 'idle' | 'resolving' | 'downloading' | 'installing' | 'complete' | 'error';
   progress: number;
   currentMod?: string;
+  currentModUrl?: string; // Download URL for the currently active mod
   downloadSpeed?: number;
   eta?: number;
   errors?: string[];

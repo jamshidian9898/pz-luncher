@@ -13,7 +13,7 @@ export function CacheManager() {
     return (
       <div className="flex items-center justify-center h-48 text-slate-400 gap-2">
         <RefreshCw size={16} className="animate-spin" />
-        بارگذاری فضا…
+        Loading storage…
       </div>
     );
   }
@@ -24,18 +24,18 @@ export function CacheManager() {
       <div>
         <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2 mb-2">
           <HardDrive size={18} className="text-emerald-400" />
-          مدیریت فضای ذخیره‌سازی
+          Storage Management
         </h2>
         <p className="text-sm text-slate-400">
-          نسخه‌ها و مود‌هایی که روی این دستگاه ذخیره شده‌اند.
+          Game versions and mods stored on this device.
         </p>
       </div>
 
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-3">
-        <StatCard label="کل استفاده" bytes={stats.totalBytes} />
-        <StatCard label="نسخه‌های بازی" bytes={stats.versionBytes} />
-        <StatCard label="مود‌ها" bytes={stats.modBytes} />
+        <StatCard label="Total used" bytes={stats.totalBytes} />
+        <StatCard label="Game versions" bytes={stats.versionBytes} />
+        <StatCard label="Mods" bytes={stats.modBytes} />
       </div>
 
       {/* Deletable suggestion */}
@@ -44,10 +44,10 @@ export function CacheManager() {
           <AlertTriangle size={16} className="text-amber-400 mt-0.5 shrink-0" />
           <div className="space-y-1">
             <p className="text-sm font-medium text-amber-300">
-              {formatBytes(stats.deletableBytes)} قابل‌حذف
+              {formatBytes(stats.deletableBytes)} deletable
             </p>
             <p className="text-xs text-amber-200">
-              نسخه‌ها و مود‌های ۳۰+ روز استفاده‌نشده و فاقد ارتباط با سرور فعال.
+              Versions and mods unused for 30+ days with no active server link.
             </p>
           </div>
         </div>
@@ -55,7 +55,7 @@ export function CacheManager() {
 
       {/* Entries list */}
       <div className="space-y-2">
-        <div className="text-sm text-slate-400 font-medium">نسخه‌های بازی</div>
+        <div className="text-sm text-slate-400 font-medium">Game versions</div>
         {stats.entries
           .filter((e) => e.type === 'version')
           .map((entry) => (
@@ -69,10 +69,10 @@ export function CacheManager() {
       </div>
 
       <div className="space-y-2">
-        <div className="text-sm text-slate-400 font-medium">مود‌ها</div>
+        <div className="text-sm text-slate-400 font-medium">Mods</div>
         {stats.entries.length === 0 ? (
           <div className="text-xs text-slate-500 p-4 bg-slate-800 rounded-lg">
-            هیچ مود پیدا نشد.
+            No mods found.
           </div>
         ) : (
           stats.entries
@@ -93,7 +93,7 @@ export function CacheManager() {
         className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
       >
         <RefreshCw size={12} />
-        بروزرسانی
+        Refresh
       </button>
     </div>
   );
@@ -137,7 +137,7 @@ function EntryRow({ entry, deleting, onDelete }: EntryRowProps) {
           </span>
           {usedByCount > 0 && (
             <span className="text-xs text-emerald-400 bg-emerald-900/30 px-2 py-0.5 rounded">
-              ✓ استفاده: {usedByCount}
+              ✓ Used by: {usedByCount}
             </span>
           )}
         </div>
@@ -145,7 +145,7 @@ function EntryRow({ entry, deleting, onDelete }: EntryRowProps) {
           <span>{formatBytes(entry.sizeBytes)}</span>
           {lastUsedDaysAgo > 0 && (
             <span>
-              آخرین استفاده: {lastUsedDaysAgo} روز پیش
+              Last used: {lastUsedDaysAgo} days ago
             </span>
           )}
         </div>
@@ -156,8 +156,8 @@ function EntryRow({ entry, deleting, onDelete }: EntryRowProps) {
         disabled={deleting || !canDelete}
         title={
           !canDelete
-            ? `در حال استفاده توسط: ${entry.usedByProfiles.join(', ')}`
-            : `حذف ${formatBytes(entry.sizeBytes)}`
+            ? `Used by: ${entry.usedByProfiles.join(', ')}`
+            : `Delete ${formatBytes(entry.sizeBytes)}`
         }
         className={`p-2 rounded transition-all ${
           deleting

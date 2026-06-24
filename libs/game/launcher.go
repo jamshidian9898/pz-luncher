@@ -1,6 +1,7 @@
 package game
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,24 +25,17 @@ var (
 	globalTracker = &ProcessTracker{}
 )
 
-// IsGameRunning returns true if the game process is still running
+// IsGameRunning returns true if the tracked game process is still running.
+// The tracker is updated by the goroutine that calls cmd.Wait() after launch.
 func IsGameRunning() bool {
 	globalTracker.mu.RLock()
 	defer globalTracker.mu.RUnlock()
-
-	if !globalTracker.running || globalTracker.process == nil {
-		return false
-	}
-
-	// Check if process is still alive
-	if err := globalTracker.process.Signal(os.Signal(nil)); err != nil {
-		globalTracker.running = false
-		return false
-	}
-	return true
+	return globalTracker.running && globalTracker.process != nil
 }
 
-// StopGame terminates the running game process
+// StopGame terminates the running game process.
+// The tracker is reset regardless of whether Kill succeeds, so the UI never
+// gets stuck believing the game is still running.
 func StopGame() error {
 	globalTracker.mu.Lock()
 	defer globalTracker.mu.Unlock()
@@ -50,11 +44,13 @@ func StopGame() error {
 		return fmt.Errorf("no game process running")
 	}
 
-	if err := globalTracker.process.Kill(); err != nil {
-		return fmt.Errorf("failed to stop game: %w", err)
+	if err := globalTracker.process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+		// Log but still reset state; the process may already be gone or may be a zombie.
+		fmt.Fprintf(os.Stderr, "stop game warning: %v\n", err)
 	}
 
 	globalTracker.running = false
+	globalTracker.process = nil
 	return nil
 }
 

@@ -21,7 +21,7 @@ export function VersionSelector({ requiredVersion, onDownloadStart, onClose }: V
     return (
       <div className="flex items-center justify-center h-64 text-slate-400 gap-2">
         <RefreshCw size={16} className="animate-spin" />
-        بارگذاری نسخه‌های دسترس...
+        Loading available versions...
       </div>
     );
   }
@@ -32,13 +32,13 @@ export function VersionSelector({ requiredVersion, onDownloadStart, onClose }: V
       <div className="space-y-4">
         <div className="flex items-center gap-3 text-emerald-400">
           <CheckCircle size={20} />
-          <span>v{selector.localVersion} روی این دستگاه موجود است</span>
+          <span>v{selector.localVersion} is available on this device</span>
         </div>
         <button
           onClick={onClose}
           className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg"
         >
-          ادامه
+          Continue
         </button>
       </div>
     );
@@ -51,12 +51,12 @@ export function VersionSelector({ requiredVersion, onDownloadStart, onClose }: V
         <div className="flex items-start gap-3">
           <AlertTriangle size={20} className="text-red-400 mt-0.5" />
           <div className="space-y-1">
-            <p className="font-medium text-red-300">نسخه v{requiredVersion} در دسترس نیست</p>
+            <p className="font-medium text-red-300">Version v{requiredVersion} is not available</p>
             <p className="text-sm text-red-200">
-              این سرور نسخه {requiredVersion} را می‌خواهد، اما هیچ منبع برای دانلود پیدا نشد.
+              This server requires version {requiredVersion}, but no download source was found.
             </p>
             <p className="text-xs text-red-300 mt-2">
-              با مدیر سرور تماس بگیر تا این نسخه را در Registry ثبت کند.
+              Contact the server admin to register this version in the Registry.
             </p>
           </div>
         </div>
@@ -70,9 +70,9 @@ export function VersionSelector({ requiredVersion, onDownloadStart, onClose }: V
   return (
     <div className="space-y-4">
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-        <h3 className="font-semibold text-slate-100 mb-2">دانلود v{candidate.gameVersion}</h3>
+        <h3 className="font-semibold text-slate-100 mb-2">Download v{candidate.gameVersion}</h3>
         <p className="text-sm text-slate-400 mb-4">
-          {formatBytes(candidate.sizeBytes)} • وضعیت: {trustBadgeText(candidate.trustLevel)}
+          {formatBytes(candidate.sizeBytes)} • Status: {trustBadgeText(candidate.trustLevel)}
         </p>
 
         <div className="space-y-2">
@@ -105,14 +105,14 @@ export function VersionSelector({ requiredVersion, onDownloadStart, onClose }: V
           ) : (
             <Download size={16} />
           )}
-          {confirming ? 'در حال شروع...' : 'دانلود و ادامه'}
+          {confirming ? 'Starting...' : 'Download and continue'}
         </button>
         {onClose && (
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg"
           >
-            لغو
+            Cancel
           </button>
         )}
       </div>
@@ -149,14 +149,17 @@ function SourceOption({ source, selected, isAuto, onSelect }: SourceOptionProps)
             <span className="font-medium text-slate-100">{source.description}</span>
             {isAuto && (
               <span className="text-xs text-emerald-400 bg-emerald-900/30 px-2 py-0.5 rounded">
-                بهترین
+                Best
               </span>
             )}
           </div>
           <p className="text-xs text-slate-500 ml-6">
-            {source.type === 'registry' && 'از پایگاه داده PZ'}
-            {source.type === 'agent' && 'از سرور مستقیم'}
-            {source.type === 'hoster' && 'از آپلود hoster (تأیید نشده)'}
+            {source.type === 'registry' && 'From PZ database'}
+            {source.type === 'agent' && 'From direct server'}
+            {source.type === 'hoster' && 'From hoster upload (unverified)'}
+          </p>
+          <p className="text-xs text-slate-600 ml-6 break-all" title="Download URL">
+            {source.url}
           </p>
         </div>
         <TrustBadge trustLevel={source.trustLevel} />
@@ -170,13 +173,13 @@ function TrustBadge({ trustLevel }: { trustLevel: string }) {
     case 'verified':
       return (
         <span className="text-xs text-emerald-400 flex items-center gap-1">
-          <CheckCircle size={12} /> تأیید شده
+          <CheckCircle size={12} /> Verified
         </span>
       );
     case 'pending':
       return (
         <span className="text-xs text-amber-400">
-          در انتظار
+          Pending
         </span>
       );
     default:
@@ -187,10 +190,10 @@ function TrustBadge({ trustLevel }: { trustLevel: string }) {
 function trustBadgeText(trustLevel: string): string {
   switch (trustLevel) {
     case 'verified':
-      return '✅ تأیید شده';
+      return '✅ Verified';
     case 'pending':
-      return '⏳ در انتظار';
+      return '⏳ Pending';
     default:
-      return '❓ نامشخص';
+      return '❓ Unknown';
   }
 }
