@@ -6,7 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"pzlauncher/libs/settings"
+
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type VersionSource struct {
@@ -37,7 +43,7 @@ type VersionSelector struct {
 // GetVersionSelector queries the backend registry and local cache
 // to determine what game versions are available and which to download.
 func (a *App) GetVersionSelector(requiredVersion string) (*VersionSelector, error) {
-	root := a.service.getWorkspaceRoot()
+	root := a.ui.getWorkspaceRoot()
 	backendURL := a.getBackendURL()
 
 	sel := &VersionSelector{
@@ -126,8 +132,8 @@ func (a *App) ConfirmVersionDownload(gameVersion, platform, sourceURL string) er
 // --- helpers ---
 
 func (a *App) getBackendURL() string {
-	root := a.service.getWorkspaceRoot()
-	st, _ := a.service.pipeline.Config.Settings(root)
+	root := a.ui.getWorkspaceRoot()
+	st, _ := settings.Load(root)
 	if st != nil && st.BackendURL != "" {
 		return st.BackendURL
 	}
@@ -135,8 +141,7 @@ func (a *App) getBackendURL() string {
 }
 
 func (a *App) detectLocalVersion(root, required string) string {
-	// Check if required version exists in cache
-	versionDir := a.service.pipeline.Config.VersionsDir(root, required)
+	versionDir := filepath.Join(root, "versions", required)
 	if _, err := os.Stat(versionDir); err == nil {
 		return required
 	}
@@ -144,9 +149,9 @@ func (a *App) detectLocalVersion(root, required string) string {
 }
 
 func (a *App) emitVersionEvent(eventType string, data map[string]interface{}) {
-	if a.service.ctx == nil {
+	if a.ui.ctx == nil {
 		return
 	}
 	data["type"] = eventType
-	a.service.ctx.Value("wailsRuntime").(interface{})
+	wailsRuntime.EventsEmit(a.ui.ctx, "version:event", data)
 }

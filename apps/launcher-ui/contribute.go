@@ -53,7 +53,7 @@ type SubmitHashResult struct {
 // GetContributeStatus scans the local version cache and the user's gamePath
 // to build a list of game versions available to contribute.
 func (a *App) GetContributeStatus() (*ContributeStatus, error) {
-	root := a.service.getWorkspaceRoot()
+	root := a.ui.getWorkspaceRoot()
 	st, _ := settings.Load(root)
 	backendURL := ""
 	if st != nil {
@@ -152,7 +152,7 @@ func (a *App) HashGameVersion(localPath string) (string, error) {
 // SubmitVersionHash calls POST /api/v1/registry/versions/{g}/{v}/{p}/submit.
 // It does NOT upload the file — only submits the hash for cross-validation.
 func (a *App) SubmitVersionHash(gameID, version, platform, sha256hex string, sizeBytes int64) (*SubmitHashResult, error) {
-	root := a.service.getWorkspaceRoot()
+	root := a.ui.getWorkspaceRoot()
 	st, _ := settings.Load(root)
 	backendURL := "http://localhost:8080"
 	if st != nil && st.BackendURL != "" {
@@ -179,7 +179,7 @@ func (a *App) SubmitVersionHash(gameID, version, platform, sha256hex string, siz
 // UploadVersionBinary streams the local file to the registry.
 // Emits progress events during upload.
 func (a *App) UploadVersionBinary(gameID, version, platform, localPath, sha256hex string) error {
-	root := a.service.getWorkspaceRoot()
+	root := a.ui.getWorkspaceRoot()
 	st, _ := settings.Load(root)
 	backendURL := "http://localhost:8080"
 	if st != nil && st.BackendURL != "" {
@@ -235,11 +235,11 @@ func (a *App) UploadVersionBinary(gameID, version, platform, localPath, sha256he
 // --- helpers ---
 
 func (a *App) emitContributeEvent(eventType string, data map[string]interface{}) {
-	if a.service.ctx == nil {
+	if a.ui.ctx == nil {
 		return
 	}
 	data["type"] = eventType
-	wailsRuntime.EventsEmit(a.service.ctx, "contribute:event", data)
+	wailsRuntime.EventsEmit(a.ui.ctx, "contribute:event", data)
 }
 
 func currentPlatform() string {
@@ -339,18 +339,6 @@ func enrichFromRegistry(backendURL string, entry *ContributeEntry) {
 			return
 		}
 	}
-}
-
-func dirSize(path string) (int64, error) {
-	var size int64
-	err := filepath.Walk(path, func(_ string, fi os.FileInfo, err error) error {
-		if err != nil || fi.IsDir() {
-			return err
-		}
-		size += fi.Size()
-		return nil
-	})
-	return size, err
 }
 
 // progressReader wraps an io.Reader and calls onProgress every 2 MB.

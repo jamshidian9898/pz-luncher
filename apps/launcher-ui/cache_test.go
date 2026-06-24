@@ -8,7 +8,7 @@ import (
 
 func TestGetCacheStats_Empty(t *testing.T) {
 	tmpdir := t.TempDir()
-	app := &App{service: &UIService{workspaceRoot: tmpdir}}
+	app := &App{ui: &UIService{workspaceRoot: tmpdir}}
 
 	stats, err := app.GetCacheStats()
 	if err != nil {
@@ -24,7 +24,7 @@ func TestGetCacheStats_Empty(t *testing.T) {
 
 func TestGetCacheStats_WithVersions(t *testing.T) {
 	tmpdir := t.TempDir()
-	app := &App{service: &UIService{workspaceRoot: tmpdir}}
+	app := &App{ui: &UIService{workspaceRoot: tmpdir}}
 
 	// Create fake version directory with a file
 	versionsDir := filepath.Join(tmpdir, "versions", "42.16")
@@ -56,7 +56,7 @@ func TestGetCacheStats_WithVersions(t *testing.T) {
 
 func TestDeleteCacheEntry_NotFound(t *testing.T) {
 	tmpdir := t.TempDir()
-	app := &App{service: &UIService{workspaceRoot: tmpdir}}
+	app := &App{ui: &UIService{workspaceRoot: tmpdir}}
 
 	err := app.DeleteCacheEntry("version", "nonexistent")
 	if err == nil {
@@ -66,7 +66,7 @@ func TestDeleteCacheEntry_NotFound(t *testing.T) {
 
 func TestDeleteCacheEntry_Success(t *testing.T) {
 	tmpdir := t.TempDir()
-	app := &App{service: &UIService{workspaceRoot: tmpdir}}
+	app := &App{ui: &UIService{workspaceRoot: tmpdir}}
 
 	// Create version to delete
 	versionsDir := filepath.Join(tmpdir, "versions", "42.16")
@@ -88,7 +88,7 @@ func TestDeleteCacheEntry_Success(t *testing.T) {
 
 func TestDeleteCacheEntry_InUseProfile(t *testing.T) {
 	tmpdir := t.TempDir()
-	app := &App{service: &UIService{workspaceRoot: tmpdir}}
+	app := &App{ui: &UIService{workspaceRoot: tmpdir}}
 
 	// Create version
 	versionsDir := filepath.Join(tmpdir, "versions", "42.16")

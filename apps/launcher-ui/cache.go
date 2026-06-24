@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type CacheEntry struct {
@@ -32,7 +34,7 @@ type CacheStats struct {
 
 // GetCacheStats returns current cache usage and suggests deletable entries.
 func (a *App) GetCacheStats() (*CacheStats, error) {
-	root := a.service.getWorkspaceRoot()
+	root := a.ui.getWorkspaceRoot()
 
 	stats := &CacheStats{
 		Entries: []CacheEntry{},
@@ -115,7 +117,7 @@ func (a *App) GetCacheStats() (*CacheStats, error) {
 // DeleteCacheEntry deletes a version or mod by key.
 // Returns error if profiles still reference it.
 func (a *App) DeleteCacheEntry(entryType, key string) error {
-	root := a.service.getWorkspaceRoot()
+	root := a.ui.getWorkspaceRoot()
 
 	var dir string
 	var profiles []string
@@ -174,11 +176,11 @@ func parseTime(s string) time.Time {
 }
 
 func (a *App) emitCacheEvent(eventType string, data map[string]interface{}) {
-	if a.service.ctx == nil {
+	if a.ui.ctx == nil {
 		return
 	}
 	data["type"] = eventType
-	a.service.ctx.Value("wailsRuntime").(interface{})
+	wailsRuntime.EventsEmit(a.ui.ctx, "cache:event", data)
 }
 
 func versionsUsedBy(root, version string) []string {

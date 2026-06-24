@@ -8,7 +8,7 @@ import (
 
 func TestGetVersionSelector_AlreadyLocal(t *testing.T) {
 	tmpdir := t.TempDir()
-	app := &App{service: &UIService{workspaceRoot: tmpdir}}
+	app := &App{ui: &UIService{workspaceRoot: tmpdir}}
 
 	// Create local version 42.16
 	versionDir := filepath.Join(tmpdir, "versions", "42.16")
@@ -19,7 +19,7 @@ func TestGetVersionSelector_AlreadyLocal(t *testing.T) {
 		t.Fatalf("GetVersionSelector failed: %v", err)
 	}
 
-	if !selector.NeedDownload {
+	if selector.NeedDownload {
 		t.Error("expected needDownload=false when version exists locally")
 	}
 	if selector.LocalVersion != "42.16" {
@@ -29,14 +29,14 @@ func TestGetVersionSelector_AlreadyLocal(t *testing.T) {
 
 func TestGetVersionSelector_MissingVersion(t *testing.T) {
 	tmpdir := t.TempDir()
-	app := &App{service: &UIService{workspaceRoot: tmpdir}}
+	app := &App{ui: &UIService{workspaceRoot: tmpdir}}
 
 	selector, err := app.GetVersionSelector("42.16")
 	if err != nil {
 		t.Fatalf("GetVersionSelector failed: %v", err)
 	}
 
-	if selector.NeedDownload {
+	if !selector.NeedDownload {
 		t.Error("expected needDownload=true when version is missing locally")
 	}
 	if selector.LocalVersion != "" {
