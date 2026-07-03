@@ -1,5 +1,3 @@
-version: "3.9"
-
 # PZ Platform — Full Operations Stack
 # Run:  docker compose -f docker-compose.yml -f docker-compose.ops.yml up
 #
