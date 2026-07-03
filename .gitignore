@@ -23,6 +23,10 @@ sessions/
 /tmp/
 /build/
 dist/
+# Keep a placeholder so go:embed all:frontend/dist resolves on fresh checkouts
+!apps/launcher-ui/frontend/dist/
+apps/launcher-ui/frontend/dist/*
+!apps/launcher-ui/frontend/dist/.gitkeep
 *.exe
 *.dll
 *.so
