@@ -61,6 +61,7 @@ type LauncherSettings struct {
 	ConcurrentDownloads   int    `json:"concurrentDownloads,omitempty"`
 	BandwidthLimitMbps    int    `json:"bandwidthLimitMbps,omitempty"`
 	VerifyChecksum        bool   `json:"verifyChecksum,omitempty"`
+	LaunchOptions         string `json:"launchOptions,omitempty"`
 }
 
 // LauncherEvent (RFC-0022)

@@ -194,6 +194,7 @@ type LauncherSettings struct {
 	ConcurrentDownloads   int    ` + "`json:\"concurrentDownloads,omitempty\"`" + `
 	BandwidthLimitMbps    int    ` + "`json:\"bandwidthLimitMbps,omitempty\"`" + `
 	VerifyChecksum        bool   ` + "`json:\"verifyChecksum,omitempty\"`" + `
+	LaunchOptions         string ` + "`json:\"launchOptions,omitempty\"`" + `
 }
 
 // LauncherEvent (RFC-0022)
@@ -270,6 +271,7 @@ export interface LauncherSettings {
   concurrentDownloads?: number;
   bandwidthLimitMbps?: number;
   verifyChecksum?: boolean;
+  launchOptions?: string;
 }
 
 export type LauncherEventType =
@@ -319,6 +321,7 @@ export interface Settings {
   maxConcurrent: number;
   bandwidthLimit: number;
   verifyChecksum: boolean;
+  launchOptions?: string;
 }
 
 export function settingsFromLauncher(s: LauncherSettings): Settings {
@@ -330,6 +333,7 @@ export function settingsFromLauncher(s: LauncherSettings): Settings {
     maxConcurrent: s.concurrentDownloads ?? 3,
     bandwidthLimit: s.bandwidthLimitMbps ?? 0,
     verifyChecksum: s.verifyChecksum ?? true,
+    launchOptions: s.launchOptions,
   };
 }
 
@@ -342,6 +346,7 @@ export function settingsToLauncher(s: Settings): LauncherSettings {
     concurrentDownloads: s.maxConcurrent,
     bandwidthLimitMbps: s.bandwidthLimit,
     verifyChecksum: s.verifyChecksum,
+    launchOptions: s.launchOptions,
   };
 }
 `
