@@ -23,6 +23,7 @@ type Options struct {
 	Token       string
 	Interval    time.Duration
 	LogFile     string
+	ServiceName string
 }
 
 // runAgent executes the agent loop until ctx is cancelled.

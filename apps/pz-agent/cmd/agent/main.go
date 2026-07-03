@@ -39,6 +39,7 @@ func main() {
 	token := flag.String("token", "", "agent auth token (or set PZ_AGENT_TOKEN env var)")
 	logFile := flag.String("logfile", "", "append logs to this file instead of stderr")
 	service := flag.String("service", "", "Windows service control: install | uninstall | start | stop")
+	serviceName := flag.String("service-name", defaultServiceName, "Windows service name (set when running multiple agents on one host)")
 	flag.Parse()
 
 	opts := Options{
@@ -49,6 +50,7 @@ func main() {
 		Token:       *token,
 		Interval:    *interval,
 		LogFile:     *logFile,
+		ServiceName: *serviceName,
 	}
 
 	if *service != "" {

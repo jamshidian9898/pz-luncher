@@ -149,7 +149,20 @@ Vagrant.configure("2") do |config|
       Write-Host "   wails build -platform windows" -ForegroundColor White
     }
   SHELL
-  
+
+  # Step 5 (on demand): single-Windows test lab — backend + agents as services,
+  # optional PZ dedicated servers, and an end-to-end verify.
+  #   vagrant provision --provision-with lab
+  # Full game-server lab: run deploy\\windows\\lab.ps1 install (no -SkipGameServers)
+  # inside the VM; see deploy/windows/README.md.
+  config.vm.provision "lab", type: "shell", privileged: true, run: "never", inline: <<-SHELL
+    Set-ExecutionPolicy Bypass -Scope Process -Force
+    C:/Users/vagrant/project/deploy/windows/lab.ps1 install -SkipGameServers
+    C:/Users/vagrant/project/deploy/windows/lab.ps1 up -SkipGameServers
+    Start-Sleep -Seconds 10
+    C:/Users/vagrant/project/deploy/windows/lab.ps1 verify
+  SHELL
+
   # ==================== POST-UP MESSAGE ====================
   
   config.vm.post_up_message = <<-MSG
