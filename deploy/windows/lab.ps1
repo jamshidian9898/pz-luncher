@@ -78,6 +78,11 @@ function Build-Binaries {
     if ($LASTEXITCODE -ne 0) { throw 'go build agent failed' }
     go build -o (Join-Path $bin 'join-cli.exe') ./apps/join-cli
     if ($LASTEXITCODE -ne 0) { throw 'go build join-cli failed' }
+    # Fake game client: lets verify assert the launch flow without the real game.
+    $fakegame = Join-Path $Root 'fakegame'
+    New-Item -ItemType Directory -Force -Path $fakegame | Out-Null
+    go build -o (Join-Path $fakegame 'ProjectZomboid64.exe') ./tools/fakegame
+    if ($LASTEXITCODE -ne 0) { throw 'go build fakegame failed' }
   }
   finally { Pop-Location }
 }
@@ -327,7 +332,23 @@ function Invoke-Verify {
   if ($LASTEXITCODE -eq 0) { Ok "join-cli -backend completed for $primary" }
   else { Fail "join-cli failed (see logs\verify-join.log)"; $failures++ }
 
-  # 6. extracted profile is byte-identical to the server's mods
+  # 6. launch flow passes profile isolation to the game (fake client)
+  $fakegameDir = Join-Path $Root 'fakegame'
+  if (Test-Path (Join-Path $fakegameDir 'ProjectZomboid64.exe')) {
+    $argsFile = Join-Path $fakegameDir 'launch-args.txt'
+    Remove-Item $argsFile -ErrorAction SilentlyContinue
+    $env:PZ_GAME_PATH = $fakegameDir
+    & $joinCli -server $primary -backend $BackendUrl -launch 2>&1 |
+      Out-File (Join-Path $Root 'logs\verify-launch.log')
+    Start-Sleep -Seconds 3
+    if ((Test-Path $argsFile) -and (Select-String -Path $argsFile -Pattern '-cachedir=' -Quiet)) {
+      Ok 'game launched with -cachedir pointing at the profile'
+    }
+    else { Fail 'fake game did not receive -cachedir (see logs\verify-launch.log)'; $failures++ }
+    Remove-Item Env:\PZ_GAME_PATH -ErrorAction SilentlyContinue
+  }
+
+  # 7. extracted profile is byte-identical to the server's mods
   $srcMods = ServerModsDir 1
   $dstMods = Join-Path $launcherRoot "profiles\$primary\mods"
   if (Test-Path $dstMods) {

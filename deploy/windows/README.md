@@ -64,7 +64,9 @@ To publish **real** mods instead of the seeded samples, drop mod folders into
 4. A versioned manifest exists for every server
 5. `join-cli -backend` (the same `POST /join` + v2 pipeline the launcher UI
    uses) completes against the live backend
-6. The extracted profile under `C:\pz-lab\launcher\profiles\pzlab1\mods` is
+6. The launch flow starts the game with `-cachedir=<profile>` (asserted via a
+   fake `ProjectZomboid64.exe` that records its argv — no real client needed)
+7. The extracted profile under `C:\pz-lab\launcher\profiles\pzlab1\mods` is
    **byte-identical** to the server's mods directory
 
 Non-zero exit on any failure — safe to call from CI or a scheduled task.

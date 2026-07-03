@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -122,18 +123,14 @@ func (l *simpleLauncher) Launch(installation contracts.GameInstallation, request
 		return contracts.LaunchResult{Success: false, Error: fmt.Sprintf("Game executable not found at %s", exePath)}, err
 	}
 
-	// Build command args: use launch args from manifest if provided
-	args := []string{}
-	if request.LaunchArgs != "" {
-		args = append(args, request.LaunchArgs)
-	}
+	args := buildLaunchArgs(request.LaunchArgs, profilePath)
 
 	// Create launch record file for tracking
 	fn := filepath.Join(profilePath, "launched.txt")
 	f, err := os.Create(fn)
 	if err == nil {
 		defer f.Close()
-		f.WriteString(fmt.Sprintf("launched at %s\ninstallation=%s\nexe=%s\nargs=%s\n", time.Now().Format(time.RFC3339), installation.Path, exePath, request.LaunchArgs))
+		f.WriteString(fmt.Sprintf("launched at %s\ninstallation=%s\nexe=%s\nargs=%s\n", time.Now().Format(time.RFC3339), installation.Path, exePath, strings.Join(args, " ")))
 	}
 
 	// Actually start the game process
@@ -162,4 +159,26 @@ func (l *simpleLauncher) Launch(installation contracts.GameInstallation, request
 
 	// Don't wait for process - let it run independently
 	return contracts.LaunchResult{Success: true, ProfileID: profilePath, LaunchArgs: request.LaunchArgs}, nil
+}
+
+// buildLaunchArgs splits the manifest/user launch options into proper argv
+// elements and injects profile isolation: -cachedir points the game at the
+// prepared profile (RFC-0034), so the mods installed there are what the game
+// loads. A user-supplied -cachedir wins over the injected one.
+func buildLaunchArgs(launchArgs, profilePath string) []string {
+	args := strings.Fields(launchArgs)
+
+	hasCachedir := false
+	for _, a := range args {
+		if strings.HasPrefix(a, "-cachedir") {
+			hasCachedir = true
+			break
+		}
+	}
+	if !hasCachedir && profilePath != "" {
+		if abs, err := filepath.Abs(profilePath); err == nil {
+			args = append(args, "-cachedir="+abs)
+		}
+	}
+	return args
 }
