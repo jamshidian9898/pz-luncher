@@ -79,7 +79,15 @@ jobs:
             go build -ldflags="-s -w -X main.Version=${{ env.VERSION }}" \
             -o dist/pz-agent-linux-arm64 ./apps/pz-agent/cmd/agent &
           pid4=$!
-          wait $pid1 $pid2 $pid3 $pid4
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 \
+            go build -ldflags="-s -w -X main.Version=${{ env.VERSION }}" \
+            -o dist/pz-backend-windows-amd64.exe ./apps/backend/cmd/backend &
+          pid5=$!
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 \
+            go build -ldflags="-s -w -X main.Version=${{ env.VERSION }}" \
+            -o dist/pz-agent-windows-amd64.exe ./apps/pz-agent/cmd/agent &
+          pid6=$!
+          wait $pid1 $pid2 $pid3 $pid4 $pid5 $pid6
 
       - name: Verify build outputs
         run: ls -la dist/

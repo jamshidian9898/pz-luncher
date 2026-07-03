@@ -99,13 +99,23 @@ and the Launcher extracts them back into a real mod folder.
 
 ## Installation
 
-The Agent is installed on the game server host via:
+Linux (systemd):
 
 ```bash
 curl https://<backend>/install.sh | bash
 ```
 
 Install script: `apps/backend/cmd/backend/install.sh` (served when `-deploy` flag set).
+
+Windows (native service, run as Administrator):
+
+```powershell
+pz-agent.exe -service install -server my-server -mods C:\pz\mods -backend http://localhost:8080
+pz-agent.exe -service start      # also: stop | uninstall
+```
+
+The service auto-starts at boot, restarts on failure, and logs to
+`pz-agent.log` next to the executable (override with `-logfile`).
 
 ---
 
