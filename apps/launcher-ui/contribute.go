@@ -6,7 +6,6 @@ package main
 // contribute game client binaries to the Content Registry.
 
 import (
-	"archive/zip"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -17,11 +16,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"sort"
 	"strings"
 	"time"
 
 	"pzlauncher/libs/settings"
+	"pzlauncher/libs/ziputil"
 
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -201,7 +200,7 @@ func (a *App) hashGameDirectory(localPath string) (*HashResult, error) {
 		}
 	}
 
-	if err := writeDeterministicZip(cw, localPath, func() {
+	if err := ziputil.WriteDeterministic(cw, localPath, func() {
 		processed++
 		emitProgress()
 	}); err != nil {
@@ -239,62 +238,6 @@ func (cw *countingWriter) Write(p []byte) (int, error) {
 	n, err := cw.w.Write(p)
 	cw.n += int64(n)
 	return n, err
-}
-
-// writeDeterministicZip packs root into a zip archive with deterministic ordering
-// and fixed metadata, so the same directory always produces the same byte stream.
-// onFile is called after each file is added.
-func writeDeterministicZip(w io.Writer, root string, onFile func()) error {
-	zw := zip.NewWriter(w)
-	defer zw.Close()
-
-	var entries []string
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		entries = append(entries, rel)
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	sort.Strings(entries)
-	fixedTime := time.Unix(0, 0)
-
-	for _, rel := range entries {
-		full := filepath.Join(root, rel)
-		header := &zip.FileHeader{
-			Name:     filepath.ToSlash(rel),
-			Method:   zip.Store,
-			Modified: fixedTime,
-		}
-		f, err := zw.CreateHeader(header)
-		if err != nil {
-			return err
-		}
-		file, err := os.Open(full)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(f, file)
-		file.Close()
-		if err != nil {
-			return err
-		}
-		if onFile != nil {
-			onFile()
-		}
-	}
-	return zw.Close()
 }
 
 // SubmitVersionHash calls POST /api/v1/registry/versions/{g}/{v}/{p}/submit.
@@ -349,7 +292,7 @@ func (a *App) UploadVersionBinary(gameID, version, platform, localPath, sha256he
 		pr, pw := io.Pipe()
 		go func() {
 			defer pw.Close()
-			if err := writeDeterministicZip(pw, localPath, nil); err != nil {
+			if err := ziputil.WriteDeterministic(pw, localPath, nil); err != nil {
 				_ = pw.CloseWithError(err)
 			}
 		}()

@@ -15,6 +15,7 @@ import (
 
 	"pzlauncher/apps/pz-agent/internal/discover"
 	"pzlauncher/apps/pz-agent/internal/retry"
+	"pzlauncher/libs/ziputil"
 )
 
 // Client publishes content to a Backend instance.
@@ -248,14 +249,15 @@ func (c *Client) setAuthHeader(req *http.Request) {
 }
 
 // openModContent returns a ReadCloser over the mod's content.
-// For a file mod this is the file itself; for a directory we create a tar stream.
+// For a file mod this is the file itself; for a directory it is the
+// deterministic zip stream whose SHA256 and size discover already declared.
 func openModContent(mod discover.Mod) (io.ReadCloser, error) {
 	fi, err := os.Stat(mod.Path)
 	if err != nil {
 		return nil, err
 	}
 	if fi.IsDir() {
-		return tarDir(mod.Path)
+		return ziputil.StreamDeterministic(mod.Path), nil
 	}
 	return os.Open(mod.Path)
 }

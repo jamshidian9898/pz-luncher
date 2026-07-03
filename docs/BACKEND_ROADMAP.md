@@ -56,15 +56,17 @@ See [AGENT_ROADMAP.md](AGENT_ROADMAP.md) for task breakdown.
 
 | Task | Status | Notes |
 |------|--------|-------|
-| `POST /api/v1/agents/register` | ⬜ Pending | One-time enrollment token |
-| `POST /api/v1/agents/heartbeat` | ⬜ Pending | 30s interval |
-| `PUT /api/v1/agents/manifest` | ⬜ Pending | Agent pushes manifest |
-| `GET /api/v1/agents/{agentId}/content/{sha256}` | ⬜ Pending | Backend pulls from agent |
+| `POST /api/v1/agents/register` | ✅ Done | Open registration, auto-creates server record; issues token |
+| `POST /api/v1/agents/heartbeat` | ✅ Done | Token-authed; updates agent gauges |
+| `PUT /api/v1/manifests/{serverId}` | ✅ Done | Versioned store + history/diff endpoints (B4) |
+| `PUT /api/v1/blobs/{sha256}` (+ HEAD) | ✅ Done | Agent **pushes** content; replaces backend-pull design |
+| Heartbeat staleness → online/degraded/offline | ✅ Done | Computed in `internal/registry` (90s / 5min) |
 | Enrollment token generation (admin/operator) | ⬜ Pending | Single-use, 24h TTL, serverId-scoped |
-| Agent lifecycle state machine | ⬜ Pending | Pending → Registered → Healthy → Offline → Revoked |
-| Heartbeat timeout enforcement (2× interval) | ⬜ Pending | — |
+| Revocation / Revoked terminal state | ⬜ Pending | — |
 
-**Phase B exit criteria**: Agent enrolls, sends heartbeats, submits manifest; Backend marks agent Healthy and content is available for Launcher join.
+**Phase B exit criteria — met 2026-07-03**: Agent registers, heartbeats, pushes
+blobs and manifest; Launcher `POST /join` builds a byte-identical profile from
+agent-published content (validated E2E via `join-cli -backend`).
 
 ---
 

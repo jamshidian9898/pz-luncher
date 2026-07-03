@@ -1,6 +1,6 @@
 # Agent Roadmap — v2.0.0 Phase B
 
-**Status**: Phase B (not started)  
+**Status**: Phase B core implemented (push-based); E2E validated 2026-07-03  
 **Depends on**: Phase A backend complete — see [BACKEND_ROADMAP.md](BACKEND_ROADMAP.md)  
 **RFCs**: [0053](rfc/0053-agent-enrollment.md) · [0056](rfc/0056-agent-minimal.md)  
 **Code**: `apps/pz-agent/`
@@ -46,24 +46,31 @@ Everything else is explicitly out of scope for this phase.
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Build `ModEntry[]` from discovered mods | ⬜ Pending | Depends on RFC-0053 backend |
-| `PUT /api/v1/agents/manifest` call | ⬜ Pending | — |
-| Retry on transient errors | 🟡 In progress | `apps/pz-agent/internal/ingest/` |
-| Re-submit on fs change | ⬜ Pending | — |
+| Build `ModEntry[]` from discovered mods | ✅ Done | `apps/pz-agent/internal/ingest/ingest.go` |
+| `PUT /api/v1/manifests/{serverId}` call | ✅ Done | Versioned store on backend (B4) |
+| Retry on transient errors | ✅ Done | `apps/pz-agent/internal/retry/` |
+| Publish only on content change | ✅ Done | Content-hash diff in `cmd/agent/main.go` |
+| Re-submit on fs change (watch) | ⬜ Pending | Poll-based via `-interval` for now |
 
-### Content serving
+### Content publishing
+
+Design change vs original RFC-0053: the Agent **pushes** blobs to the Backend
+(`PUT /api/v1/blobs/{sha256}`) instead of serving them for Backend pull.
+Directory mods are identified by the SHA256 of their **deterministic zip
+archive** (`libs/ziputil`), so the uploaded bytes always match the declared hash
+and the Launcher extracts them back into a real mod folder.
 
 | Task | Status | Notes |
 |------|--------|-------|
-| HTTP server for blob requests | ⬜ Pending | Backend calls `GET /content/{sha256}` on agent |
-| Stream mod archive on request | ⬜ Pending | — |
+| Push blobs (HEAD-then-PUT, idempotent) | ✅ Done | `ingest.PushBlob` |
+| Deterministic zip identity for directory mods | ✅ Done | `libs/ziputil` |
 
 ### Heartbeat
 
 | Task | Status | Notes |
 |------|--------|-------|
-| `POST /api/v1/agents/heartbeat` every 30s | ⬜ Pending | Depends on RFC-0053 backend |
-| Reconnect on backend unavailable | ⬜ Pending | Exponential backoff |
+| `POST /api/v1/agents/heartbeat` | ✅ Done | Interval via `-interval` flag |
+| Reconnect on backend unavailable | ✅ Done | Exponential backoff (`internal/retry`) |
 
 ---
 
@@ -71,20 +78,22 @@ Everything else is explicitly out of scope for this phase.
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Read enrollment token from `agent.json` / env | ⬜ Pending | Single-use, 24h TTL |
-| `POST /api/v1/agents/register` on startup | ⬜ Pending | Returns agent access token |
-| Persist agent token securely | ⬜ Pending | `agent-token` file, mode 0600 |
+| `POST /api/v1/agents/register` on startup | ✅ Done | Open registration; returns access token |
+| Token via `-token` flag / `PZ_AGENT_TOKEN` env | ✅ Done | `cmd/agent/main.go` |
+| One-time enrollment tokens (single-use, 24h TTL) | ⬜ Pending | Registration is open for MVP |
+| Persist agent token securely | ⬜ Pending | Token held in memory per run |
 | Re-enroll if token revoked (401 response) | ⬜ Pending | — |
 
 ---
 
 ## Phase B exit criteria
 
-- [ ] Agent enrolls with a one-time token and receives agent access token
-- [ ] Agent sends heartbeat every 30s; Backend marks it Healthy
-- [ ] Agent scans mods and submits manifest to Backend
-- [ ] Backend can pull a mod blob from Agent via content serving endpoint
-- [ ] A Launcher `POST /join` results in valid download URLs served by Agent content
+- [x] Agent registers and receives agent access token *(open registration for MVP)*
+- [x] Agent sends heartbeats; Backend marks it online/degraded/offline
+- [x] Agent scans mods and submits manifest to Backend
+- [x] Agent pushes mod blobs to Backend content store *(push replaces pull design)*
+- [x] A Launcher `POST /join` downloads agent-published content and builds a
+      byte-identical profile — validated E2E 2026-07-03 (`join-cli -backend`)
 
 ---
 

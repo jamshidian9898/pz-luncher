@@ -10,6 +10,7 @@ import (
 	"runtime"
 
 	"pzlauncher/libs/contracts"
+	"pzlauncher/libs/ziputil"
 )
 
 type ProfileBuilder struct {
@@ -75,6 +76,22 @@ func (b *ProfileBuilder) Prepare(serverID string, manifestID string, packages []
 		}
 		if p.Size != 0 && size != p.Size {
 			return "", fmt.Errorf("size mismatch for %s: expected %d got %d", p.ID, p.Size, size)
+		}
+
+		// Directory mods arrive as deterministic zip blobs — extract them so
+		// the game sees a real mod folder, not an opaque archive.
+		if ziputil.IsZipFile(cacheBlob) {
+			marker := filepath.Join(pkgDir, ".pz-extracted")
+			if prev, err := os.ReadFile(marker); err == nil && string(prev) == p.SHA256 {
+				continue
+			}
+			if err := ziputil.Extract(cacheBlob, pkgDir); err != nil {
+				return "", fmt.Errorf("extract %s: %w", p.ID, err)
+			}
+			if err := os.WriteFile(marker, []byte(p.SHA256), 0o644); err != nil {
+				return "", fmt.Errorf("write extract marker: %w", err)
+			}
+			continue
 		}
 
 		// idempotent: if dest exists and points to the same blob, continue

@@ -37,6 +37,9 @@ Fixture: [fixtures/manifests/demo-survival.json](../fixtures/manifests/demo-surv
 
 ## What works today
 
+- **Full v2 loop (E2E validated 2026-07-03)**: agent scans a real mods dir →
+  pushes deterministic-zip blobs + versioned manifest to backend → launcher
+  `POST /join` downloads, verifies, and extracts a byte-identical profile
 - **launcher-core**: offline resolve → profile → launch (demo)
 - **libs/session**: download execution, Steam, validation CLIs
 - **launcher-ui**: server list, downloads panel, settings, trace viewer, event system
@@ -47,8 +50,14 @@ Fixture: [fixtures/manifests/demo-survival.json](../fixtures/manifests/demo-surv
 ## Try the join pipeline (CLI)
 
 ```bash
+# offline fixture path
 go run ./apps/join-cli -server=demo-survival
 go run ./apps/join-cli -server=demo-survival -launch
+
+# live backend path (same pipeline as the UI)
+go run ./apps/backend/cmd/backend &
+go run ./apps/pz-agent/cmd/agent -server=my-server -mods=/path/to/mods -interval=0
+go run ./apps/join-cli -server=my-server -backend=http://localhost:8080
 ```
 
 ## Next (UI polish)

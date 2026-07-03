@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"pzlauncher/libs/ziputil"
 )
 
 // Mod represents a locally discovered mod file.
@@ -110,33 +112,11 @@ func hashFile(path string) (string, int64, error) {
 	return hex.EncodeToString(h.Sum(nil)), n, nil
 }
 
-// hashDir computes a stable SHA256 over all files in a directory tree by
-// hashing each file path+content in sorted order.
+// hashDir identifies a directory mod by the SHA256 and size of its
+// deterministic zip archive — the exact bytes the Agent uploads, so the
+// Backend's checksum verification matches.
 func hashDir(dir string) (string, int64, error) {
-	h := sha256.New()
-	var total int64
-
-	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		// Include relative path so renames change the hash
-		rel, _ := filepath.Rel(dir, path)
-		fmt.Fprintf(h, "file:%s\n", rel)
-
-		f, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		n, err := io.Copy(h, f)
-		total += n
-		return err
-	})
-	if err != nil {
-		return "", 0, fmt.Errorf("hashDir %q: %w", dir, err)
-	}
-	return hex.EncodeToString(h.Sum(nil)), total, nil
+	return ziputil.HashDir(dir)
 }
 
 // shouldSkip returns true for files/directories that are not actual mods.
