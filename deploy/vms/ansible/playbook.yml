@@ -1,0 +1,257 @@
+---
+# PZ Platform — VM provisioning (deploy/vms/vms.sh provision)
+#
+# Per VM:
+#   1. System update (apt dist-upgrade)
+#   2. steamcmd (tarball) + real PZ Dedicated Server (app 380870, anonymous)
+#   3. A distinct sample mod, wired into the server's Mods= config
+#   4. pz-agent (binary copied from the control host) as a systemd service
+#   5. pz-server as a systemd service
+#
+# Idempotent: safe to re-run; existing config/mods are kept (force: false),
+# steamcmd skips when the server is already installed.
+#
+# Host-specific vars come from the generated inventory:
+#   pz_server_name (pzvm1, pzvm2, ...), seed_mod_id (LabModA, LabModB, ...),
+#   agent_local_bin, pz_backend_url
+
+- name: Provision PZ game-server VM
+  hosts: pz_vms
+  become: true
+
+  vars:
+    pz_user: pzserver
+    pz_home: /home/pzserver
+    pz_install_dir: "{{ pz_home }}/pz-server"
+    pz_data_dir: "{{ pz_home }}/Zomboid"
+    pz_mods_dir: "{{ pz_data_dir }}/mods"
+    pz_agent_interval: 60s
+    pz_max_heap: 1536m
+    # steamcmd self-updates in place, so it must live in a dir pzserver owns
+    steamcmd_dir: "{{ pz_home }}/steamcmd"
+    agent_bin: /usr/local/bin/pz-agent
+
+  tasks:
+    # ── System update ──
+    - name: Update apt cache and upgrade system
+      apt:
+        update_cache: true
+        upgrade: dist
+
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - lib32gcc-s1
+          - acl # needed by Ansible become_user for unprivileged users
+        state: present
+
+    # ── PZ user + directories ──
+    - name: Create pzserver user
+      user:
+        name: "{{ pz_user }}"
+        shell: /bin/bash
+        home: "{{ pz_home }}"
+        create_home: true
+
+    - name: Create required directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ pz_user }}"
+        group: "{{ pz_user }}"
+        mode: "0755"
+      loop:
+        - "{{ pz_install_dir }}"
+        - "{{ pz_data_dir }}"
+        - "{{ pz_mods_dir }}"
+        - "{{ pz_data_dir }}/Server"
+
+    # ── steamcmd (tarball — app 380870 works with anonymous login) ──
+    - name: Create steamcmd dir
+      file:
+        path: "{{ steamcmd_dir }}"
+        state: directory
+        owner: "{{ pz_user }}"
+        group: "{{ pz_user }}"
+        mode: "0755"
+
+    - name: Install steamcmd
+      unarchive:
+        src: https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
+        dest: "{{ steamcmd_dir }}"
+        remote_src: true
+        owner: "{{ pz_user }}"
+        group: "{{ pz_user }}"
+        creates: "{{ steamcmd_dir }}/steamcmd.sh"
+
+    - name: Install PZ Dedicated Server (anonymous, ~4 GB on first run)
+      become_user: "{{ pz_user }}"
+      # steamcmd sporadically fails with "Missing configuration" on a fresh
+      # install; a retry after a short pause reliably resolves it.
+      shell: |
+        for attempt in 1 2 3; do
+          {{ steamcmd_dir }}/steamcmd.sh \
+            +force_install_dir {{ pz_install_dir }} \
+            +login anonymous \
+            +app_update 380870 validate \
+            +quit && exit 0
+          echo "steamcmd attempt $attempt failed, retrying in 20s..." >&2
+          sleep 20
+        done
+        exit 1
+      args:
+        creates: "{{ pz_install_dir }}/start-server.sh"
+      async: 5400
+      poll: 30
+
+    - name: Limit PZ server JVM heap to fit the VM
+      replace:
+        path: "{{ pz_install_dir }}/ProjectZomboid64.json"
+        regexp: '-Xmx\d+[mg]'
+        replace: "-Xmx{{ pz_max_heap }}"
+      failed_when: false
+
+    # ── Distinct sample mod per server (kept if already present) ──
+    - name: Create seed mod directories
+      file:
+        path: "{{ pz_mods_dir }}/{{ seed_mod_id }}/media/lua"
+        state: directory
+        owner: "{{ pz_user }}"
+        group: "{{ pz_user }}"
+        mode: "0755"
+
+    - name: Write seed mod.info
+      copy:
+        dest: "{{ pz_mods_dir }}/{{ seed_mod_id }}/mod.info"
+        content: |
+          name={{ seed_mod_id }}
+          id={{ seed_mod_id }}
+          description=Sample mod for {{ pz_server_name }} managed by pz-launcher lab
+        owner: "{{ pz_user }}"
+        group: "{{ pz_user }}"
+        force: false
+
+    - name: Write seed mod lua
+      copy:
+        dest: "{{ pz_mods_dir }}/{{ seed_mod_id }}/media/lua/init.lua"
+        content: |
+          print('{{ seed_mod_id }} loaded on {{ pz_server_name }}')
+        owner: "{{ pz_user }}"
+        group: "{{ pz_user }}"
+        force: false
+
+    # ── PZ server config (mods wired in; kept once created) ──
+    - name: Create PZ server config
+      copy:
+        dest: "{{ pz_data_dir }}/Server/{{ pz_server_name }}.ini"
+        content: |
+          DefaultPort=16261
+          UDPPort=16262
+          MaxPlayers=16
+          PVP=true
+          PauseEmpty=true
+          Open=true
+          Password=
+          PublicName={{ pz_server_name }}
+          PublicDescription=PZ test server managed by pz-launcher lab
+          Mods={{ seed_mod_id }}
+          Map=Muldraugh, KY
+        owner: "{{ pz_user }}"
+        group: "{{ pz_user }}"
+        force: false
+
+    # ── pz-agent (binary built on the control host) ──
+    - name: Copy pz-agent binary
+      copy:
+        src: "{{ agent_local_bin }}"
+        dest: "{{ agent_bin }}"
+        mode: "0755"
+      notify: restart pz-agent
+
+    - name: Create pz-agent systemd service
+      copy:
+        dest: /etc/systemd/system/pz-agent.service
+        content: |
+          [Unit]
+          Description=PZ Launcher Agent ({{ pz_server_name }})
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User={{ pz_user }}
+          ExecStart={{ agent_bin }} \
+            -server {{ pz_server_name }} \
+            -backend {{ pz_backend_url }} \
+            -mods {{ pz_mods_dir }} \
+            -interval {{ pz_agent_interval }}
+          Restart=on-failure
+          RestartSec=15s
+          SyslogIdentifier=pz-agent
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: restart pz-agent
+
+    - name: Enable and start pz-agent
+      systemd:
+        name: pz-agent
+        daemon_reload: true
+        enabled: true
+        state: started
+
+    # ── pz-server service ──
+    - name: Create pz-server systemd service
+      copy:
+        dest: /etc/systemd/system/pz-server.service
+        content: |
+          [Unit]
+          Description=Project Zomboid Dedicated Server ({{ pz_server_name }})
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User={{ pz_user }}
+          WorkingDirectory={{ pz_install_dir }}
+          ExecStart=/bin/bash {{ pz_install_dir }}/start-server.sh \
+            -servername {{ pz_server_name }} \
+            -adminusername admin -adminpassword pzlab-admin-1!
+          Restart=on-failure
+          RestartSec=30s
+          SyslogIdentifier=pz-server
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: restart pz-server
+
+    - name: Enable and start pz-server
+      systemd:
+        name: pz-server
+        daemon_reload: true
+        enabled: true
+        state: started
+
+    # ── Report ──
+    - name: Collect service states
+      command: systemctl is-active pz-agent pz-server
+      register: svc_states
+      failed_when: false
+
+    - name: Show service states
+      debug:
+        msg: "{{ inventory_hostname }} ({{ pz_server_name }}): agent={{ svc_states.stdout_lines[0] | default('?') }} server={{ svc_states.stdout_lines[1] | default('?') }}"
+
+  handlers:
+    - name: restart pz-agent
+      systemd:
+        name: pz-agent
+        daemon_reload: true
+        state: restarted
+
+    - name: restart pz-server
+      systemd:
+        name: pz-server
+        daemon_reload: true
+        state: restarted
