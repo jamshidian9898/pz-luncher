@@ -1,6 +1,9 @@
 # Domain RFC Index — Phase 1 Product / v2.0.0
 
+**Last updated**: 2026-08-01
+
 **Active execution**. Infrastructure RFCs (0022–0025) are **complete** — do not extend without a product bug.
+Phase A/B/C (RFCs 0050–0062) are implemented and covered by passing Go tests + a clean frontend build. See [docs/progress.md](progress.md) for current status.
 
 **Decision**: [PRODUCT_DECISION.md](../PRODUCT_DECISION.md)  
 **Roadmap**: [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
@@ -40,10 +43,11 @@
 
 | RFC | Title | Status |
 |-----|-------|--------|
-| [0058](rfc/0058-game-version-management.md) | Game Version Management | **Active** |
-| [0059](rfc/0059-content-registry.md) | Content Registry | **Active** |
-| [0060](rfc/0060-community-upload.md) | Community Upload & Cross-Validation | **Active** |
-| [0061](rfc/0061-cache-manager.md) | Cache Manager | **Active** |
+| [0058](rfc/0058-game-version-management.md) | Game Version Management | ✅ Implemented |
+| [0059](rfc/0059-content-registry.md) | Content Registry | ✅ Implemented (`apps/backend/internal/registry`) |
+| [0060](rfc/0060-community-upload.md) | Community Upload & Cross-Validation | ✅ Implemented (`contribute.go`) |
+| [0061](rfc/0061-cache-manager.md) | Cache Manager | ✅ Implemented (`cache.go`) |
+| [0062](rfc/0062-game-version-selection.md) | Game Version Selection | ✅ Implemented (`versionselect.go`) |
 
 **Build order (Phase C)**:
 1. RFC-0059 — Content Registry API + storage

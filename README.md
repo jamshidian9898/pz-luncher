@@ -14,11 +14,16 @@
 | Layer | Status |
 |-------|--------|
 | UI infrastructure (RFC-0024/0025) | ✅ Done — use, don't extend |
-| Go session / download core | ✅ Usable — wire to product flow |
-| Domain (manifest → launch) | 🟡 **Active** — RFC-0030 → 0035 |
-| Cloud microservices | ⏸️ After MVP |
+| Go session / download core | ✅ Usable — wired to product flow |
+| Domain (manifest → launch → settings) | ✅ Done — RFC-0030 → 0036 |
+| Backend + Agent (RFC-0050 → 0056) | ✅ Done |
+| Game version mgmt + Content Registry (RFC-0058 → 0062) | ✅ Done |
+| Admin UI (RFC-0057) | 🟡 Basic, not fleshed out |
+| Cloud microservices | ⏸️ Not needed |
 
-**Start here**: [docs/rfc/0030-server-manifest-v1.md](docs/rfc/0030-server-manifest-v1.md)
+Verified 2026-08-01: `go build ./...`, `go test ./...`, and the frontend build all pass on `main`.
+
+**Start here**: [docs/progress.md](docs/progress.md) for current status, [docs/DOMAIN_RFC_INDEX.md](docs/DOMAIN_RFC_INDEX.md) for the full RFC list.
 
 ---
 

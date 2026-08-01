@@ -2,8 +2,8 @@
 
 **Platform**: PZ Launcher Execution Kernel  
 **Status**: 🟢 **FROZEN v1.0** (Go core)  
-**Product**: 🟡 **Phase 1 Execution** — see [PRODUCT_DECISION.md](PRODUCT_DECISION.md)  
-**Last Updated**: 2026-06-04  
+**Product**: 🟢 **Phase A/B/C complete** (Backend + Agent + Game Version Mgmt/Content Registry) — see [docs/progress.md](docs/progress.md)  
+**Last Updated**: 2026-08-01 — verified live: `go build ./...`, `go test ./...`, and frontend `npm run build` all pass on `main` (`b14cef2`)  
 
 ## Product layer (active)
 
