@@ -1,6 +1,6 @@
 # RFC-0057: Admin UI
 
-**Status**: Skeleton only — post-MVP  
+**Status**: Mostly implemented (2026-08-24) — download statistics remaining  
 **Depends on**: [RFC-0052](0052-backend-core-api.md), [RFC-0053](0053-agent-enrollment.md)  
 **Code**: `apps/admin-ui/`
 
@@ -17,9 +17,9 @@ A web dashboard for Backend operators to monitor servers, agents, and content st
 ```
 ✅ Server list + health status
 ✅ Per-server agent status (Healthy / Offline / Revoked)
-⬜ Content store browser (SHA256 blobs, size, source)
-⬜ Agent enrollment token generation
-⬜ Manifest viewer per server
+✅ Content store browser (SHA256 blobs, size, source) — GET /api/v1/blobs
+✅ Agent enrollment token generation — /api/v1/admin/tokens, guarded by -admin-token
+✅ Manifest viewer per server — ServerDetail "Manifest" tab
 ⬜ Download statistics
 ```
 
