@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'chore/**'
+      - 'feat/**'
+      - 'fix/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ────────────────────────────────────────────────
+  # Go: vet + lint + build + test
+  # ────────────────────────────────────────────────
+  go:
+    name: Go Vet / Lint / Build / Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Lint (golangci-lint)
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+      # frontend/dist/.gitkeep keeps go:embed resolvable without an npm build.
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test ./... -count=1
+
+  # ────────────────────────────────────────────────
+  # Launcher frontend: typecheck/build + vitest
+  # ────────────────────────────────────────────────
+  launcher-frontend:
+    name: Launcher Frontend Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: apps/launcher-ui/frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: apps/launcher-ui/frontend
+        run: npm ci
+      - name: Build (tsc + vite)
+        working-directory: apps/launcher-ui/frontend
+        run: npm run build
+      - name: Unit tests
+        working-directory: apps/launcher-ui/frontend
+        run: npx vitest run
