@@ -123,3 +123,67 @@ func TestBlobPath_UsesTwoLevelPrefix(t *testing.T) {
 		t.Fatalf("expected %q, got %q", want, got)
 	}
 }
+
+func TestAnnotate_List_Metadata(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewDiskStore(dir)
+	if err != nil {
+		t.Fatalf("new disk store: %v", err)
+	}
+
+	a, b := sha256Hex("blob-a"), sha256Hex("blob-b")
+	if err := store.Put(a, strings.NewReader("blob-a")); err != nil {
+		t.Fatalf("put a: %v", err)
+	}
+	if err := store.Put(b, strings.NewReader("blob-b")); err != nil {
+		t.Fatalf("put b: %v", err)
+	}
+	if err := store.Annotate(a, BlobMeta{SourceServer: "srv-1"}); err != nil {
+		t.Fatalf("annotate: %v", err)
+	}
+
+	got, err := store.List()
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 blobs, got %d", len(got))
+	}
+	byHash := map[string]BlobInfo{}
+	for _, bi := range got {
+		byHash[bi.SHA256] = bi
+	}
+	if byHash[a].SourceServer != "srv-1" {
+		t.Fatalf("expected sourceServer srv-1 for blob-a, got %q", byHash[a].SourceServer)
+	}
+	if byHash[b].SourceServer != "" {
+		t.Fatalf("expected no sourceServer for un-annotated blob, got %q", byHash[b].SourceServer)
+	}
+	if byHash[a].SizeBytes != 6 || byHash[b].SizeBytes != 6 {
+		t.Fatalf("unexpected sizes: %+v", got)
+	}
+}
+
+func TestAnnotate_PersistsAcrossStoreInstances(t *testing.T) {
+	dir := t.TempDir()
+	store, _ := NewDiskStore(dir)
+	hash := sha256Hex("persist-me")
+	if err := store.Put(hash, strings.NewReader("persist-me")); err != nil {
+		t.Fatalf("put: %v", err)
+	}
+	if err := store.Annotate(hash, BlobMeta{SourceServer: "pz-test-9"}); err != nil {
+		t.Fatalf("annotate: %v", err)
+	}
+
+	reopened, err := NewDiskStore(dir)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	list, err := reopened.List()
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(list) != 1 || list[0].SourceServer != "pz-test-9" {
+		t.Fatalf("metadata not persisted: %+v", list)
+	}
+}

@@ -11,15 +11,32 @@ package storage
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
+	"time"
 )
 
 // ErrNotFound is returned by Get when the blob is not in the store.
 var ErrNotFound = errors.New("blob not found")
+
+// BlobMeta describes who uploaded a blob and when (operator-facing metadata).
+type BlobMeta struct {
+	SourceServer string    `json:"sourceServer,omitempty"`
+	UploadedAt   time.Time `json:"uploadedAt,omitempty"`
+}
+
+// BlobInfo is one entry in a store listing.
+type BlobInfo struct {
+	SHA256     string `json:"sha256"`
+	SizeBytes  int64  `json:"sizeBytes"`
+	SourceServer string `json:"sourceServer,omitempty"`
+	FirstSeenAt  time.Time `json:"firstSeenAt,omitempty"`
+}
 
 // Store is the content-addressable blob store interface.
 // Every method is keyed by the hex-encoded SHA256 of the content.
@@ -37,11 +54,22 @@ type Store interface {
 
 	// Size returns the stored byte size of a blob, or 0 if absent.
 	Size(sha256hex string) int64
+
+	// Annotate records operator-facing metadata for a blob. Best-effort:
+	// implementations may ignore it; missing metadata must never break ingestion.
+	Annotate(sha256hex string, meta BlobMeta) error
+
+	// List returns every blob in the store with whatever metadata is known.
+	List() ([]BlobInfo, error)
 }
 
-// DiskStore is the Phase-A implementation: plain files on disk.
+// DiskStore is the Phase-A implementation: plain files on disk plus an
+// index.json sidecar for operator metadata.
 type DiskStore struct {
 	root string
+
+	mu    sync.Mutex
+	index map[string]BlobMeta // sha256 → metadata
 }
 
 // NewDiskStore creates (or opens) a DiskStore at the given root directory.
@@ -49,7 +77,39 @@ func NewDiskStore(root string) (*DiskStore, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, fmt.Errorf("storage: create root %q: %w", root, err)
 	}
-	return &DiskStore{root: root}, nil
+	d := &DiskStore{root: root, index: map[string]BlobMeta{}}
+	d.loadIndex()
+	return d, nil
+}
+
+func (d *DiskStore) indexPath() string {
+	return filepath.Join(d.root, "index.json")
+}
+
+// loadIndex reads the metadata sidecar. Missing or corrupt index is not fatal —
+// the store still works, it just lacks operator metadata.
+func (d *DiskStore) loadIndex() {
+	data, err := os.ReadFile(d.indexPath())
+	if err != nil {
+		return
+	}
+	var idx map[string]BlobMeta
+	if json.Unmarshal(data, &idx) == nil {
+		d.index = idx
+	}
+}
+
+// saveIndex atomically writes the sidecar. Caller must hold d.mu.
+func (d *DiskStore) saveIndex() error {
+	data, err := json.MarshalIndent(d.index, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := d.indexPath() + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, d.indexPath())
 }
 
 func (d *DiskStore) blobPath(sha256hex string) string {
@@ -125,4 +185,61 @@ func (d *DiskStore) Size(sha256hex string) int64 {
 		return 0
 	}
 	return fi.Size()
+}
+
+// Annotate records operator metadata for a blob (best-effort).
+func (d *DiskStore) Annotate(sha256hex string, meta BlobMeta) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if prev, ok := d.index[sha256hex]; ok {
+		if meta.SourceServer == "" {
+			meta.SourceServer = prev.SourceServer
+		}
+		if meta.UploadedAt.IsZero() {
+			meta.UploadedAt = prev.UploadedAt
+		}
+	}
+	d.index[sha256hex] = meta
+	return d.saveIndex()
+}
+
+// List returns every blob on disk merged with any known metadata,
+// sorted by SHA256 for stable output.
+func (d *DiskStore) List() ([]BlobInfo, error) {
+	d.mu.Lock()
+	idx := make(map[string]BlobMeta, len(d.index))
+	for k, v := range d.index {
+		idx[k] = v
+	}
+	d.mu.Unlock()
+
+	var out []BlobInfo
+	err := filepath.WalkDir(d.root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !entry.Type().IsRegular() {
+			return nil
+		}
+		name := entry.Name()
+		if len(name) != 64 || filepath.Dir(path) == d.root {
+			return nil // skip index.json, tmp files, and non-blob entries
+		}
+		for _, c := range name {
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+				return nil // not a hex sha256 name
+			}
+		}
+		info := BlobInfo{SHA256: name, SizeBytes: d.Size(name)}
+		if meta, ok := idx[name]; ok {
+			info.SourceServer = meta.SourceServer
+			info.FirstSeenAt = meta.UploadedAt
+		}
+		out = append(out, info)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("storage: list: %w", err)
+	}
+	return out, nil
 }
