@@ -16,6 +16,9 @@ apps/backend/store/
 profiles/
 sessions/
 
+# Local machine settings (absolute paths must not be committed)
+/config/launcher-settings.json
+
 # Built binaries in root
 /launcher-ui
 /agent
