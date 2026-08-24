@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { AgentState, ManifestDiff, VersionSummary, fetchAgents, fetchDiff, fetchHistory } from '../api'
 import StatusBadge from '../components/StatusBadge'
 import DiffViewer from '../components/DiffViewer'
-import { ArrowLeft, GitBranch, Clock, Package } from 'lucide-react'
+import { ArrowLeft, GitBranch, Clock, Package, List, GitCompare } from 'lucide-react'
 
 interface Props {
   serverId: string
@@ -17,10 +17,19 @@ function timeAgo(iso: string) {
   return `${Math.floor(diff / 3600)}h ago`
 }
 
+function formatSize(bytes?: number) {
+  if (!bytes) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+}
+
 export default function ServerDetail({ serverId, serverName, onBack }: Props) {
   const [agent, setAgent]     = useState<AgentState | null>(null)
   const [history, setHistory] = useState<VersionSummary[]>([])
   const [diff, setDiff]       = useState<ManifestDiff | null>(null)
+  const [manifest, setManifest] = useState<ManifestDiff | null>(null)
+  const [rightTab, setRightTab] = useState<'diff' | 'manifest'>('diff')
   const [fromVer, setFromVer] = useState(0)
   const [toVer, setToVer]     = useState(0)
 
@@ -47,6 +56,8 @@ export default function ServerDetail({ serverId, serverName, onBack }: Props) {
   useEffect(() => {
     if (toVer === 0) return
     fetchDiff(serverId, fromVer, toVer).then(setDiff)
+    // from=0 → every mod appears under "added", i.e. the full manifest contents.
+    fetchDiff(serverId, 0, toVer).then(setManifest)
   }, [serverId, fromVer, toVer])
 
   return (
@@ -119,13 +130,49 @@ export default function ServerDetail({ serverId, serverName, onBack }: Props) {
           )}
         </div>
 
-        {/* Diff viewer */}
+        {/* Diff / Manifest viewer */}
         <div className="bg-slate-800/60 rounded-xl border border-slate-700/50 p-4">
-          <h3 className="text-sm font-semibold text-slate-300 mb-3">Diff</h3>
-          {diff ? (
-            <DiffViewer diff={diff} />
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex gap-1 bg-slate-900/60 p-1 rounded-lg border border-slate-700/50">
+              <button
+                onClick={() => setRightTab('diff')}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors
+                  ${rightTab === 'diff' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <GitCompare size={12} /> Diff
+              </button>
+              <button
+                onClick={() => setRightTab('manifest')}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors
+                  ${rightTab === 'manifest' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <List size={12} /> Manifest
+              </button>
+            </div>
+          </div>
+          {rightTab === 'diff' ? (
+            diff ? (
+              <DiffViewer diff={diff} />
+            ) : (
+              <div className="text-sm text-slate-500 italic">Select a version to view diff.</div>
+            )
+          ) : manifest && (manifest.added ?? []).length > 0 ? (
+            <div className="space-y-1">
+              <div className="text-xs text-slate-500 mb-2">
+                v{manifest.toVersion} · {manifest.added!.length} mod{manifest.added!.length !== 1 ? 's' : ''}
+              </div>
+              {manifest.added!.map(m => (
+                <div key={m.sha256} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-slate-900/40 border border-slate-700/40">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-100 truncate">{m.name || m.id}</div>
+                    <div className="text-xs text-slate-500 font-mono truncate">{m.sha256.slice(0, 16)}…</div>
+                  </div>
+                  <span className="text-xs text-slate-400 shrink-0">{formatSize(m.sizeBytes)}</span>
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="text-sm text-slate-500 italic">Select a version to view diff.</div>
+            <div className="text-sm text-slate-500 italic">Select a version to view its manifest.</div>
           )}
         </div>
       </div>
