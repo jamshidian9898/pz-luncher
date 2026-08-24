@@ -1,0 +1,194 @@
+{
+  "info": {
+    "name": "PZ Agent → Backend API",
+    "description": "The Backend endpoints the pz-agent (apps/pz-agent) talks to: enrollment, blob push, manifest publish, and heartbeat (RFC-0056, RFC-0053). A read-only 'Verification' folder is included to inspect what the agent published without needing the launcher UI. Run 'Register Agent' first — it stores the issued token into the {{token}} collection variable automatically.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "serverId", "value": "my-server", "type": "string" },
+    { "key": "serverName", "value": "My Server", "type": "string" },
+    { "key": "gameVersion", "value": "42.10.1", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "sha256", "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Bootstrap",
+      "item": [
+        {
+          "name": "Register Agent",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serverId\": \"{{serverId}}\",\n  \"serverName\": \"{{serverName}}\",\n  \"gameVersion\": \"{{gameVersion}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/agents/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "agents", "register"]
+            },
+            "description": "Bootstrap endpoint (not token-protected). Auto-creates the server record if serverId doesn't exist yet, returns the agent's access token. This mirrors ingest.Client.Register in apps/pz-agent/internal/ingest/ingest.go."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.token) {",
+                  "    pm.collectionVariables.set('token', body.token);",
+                  "    console.log('Saved token to {{token}} collection variable');",
+                  "}",
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response has a token', () => pm.expect(body.token).to.be.a('string').and.not.empty);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Content Sync",
+      "item": [
+        {
+          "name": "Check Blob Exists (HEAD)",
+          "request": {
+            "method": "HEAD",
+            "header": [
+              { "key": "X-Agent-Token", "value": "{{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blobs/{{sha256}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "blobs", "{{sha256}}"]
+            },
+            "description": "200 = blob already in the content store, agent skips upload. 404 = not present yet. Requires X-Agent-Token."
+          }
+        },
+        {
+          "name": "Upload Blob (PUT)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-Agent-Token", "value": "{{token}}" },
+              { "key": "Content-Type", "value": "application/octet-stream" }
+            ],
+            "body": {
+              "mode": "file",
+              "file": { "src": "" }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blobs/{{sha256}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "blobs", "{{sha256}}"]
+            },
+            "description": "Idempotent content-addressable upload: the sha256 in the URL must match the uploaded bytes' real hash or the Backend returns 400 BLOB_CHECKSUM_MISMATCH. In Postman, attach the mod file/zip under Body > binary before sending. 401 = token missing/revoked (the agent auto re-registers on this in code; do it manually here by re-running 'Register Agent')."
+          }
+        },
+        {
+          "name": "Publish Manifest (PUT)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-Agent-Token", "value": "{{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serverId\": \"{{serverId}}\",\n  \"version\": \"20260802T120000Z\",\n  \"gameVersion\": \"{{gameVersion}}\",\n  \"mods\": [\n    {\n      \"id\": \"ExampleMod\",\n      \"name\": \"Example Mod\",\n      \"version\": \"1\",\n      \"sha256\": \"{{sha256}}\",\n      \"sizeBytes\": 0,\n      \"workshopId\": \"\",\n      \"dependencies\": []\n    }\n  ],\n  \"launchArgs\": [],\n  \"profile\": { \"profileId\": \"{{serverId}}\" }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/manifests/{{serverId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "manifests", "{{serverId}}"]
+            },
+            "description": "Stores a new versioned manifest. Mirrors ingest.Client.PublishManifest — mods[].sha256 must already be uploaded via 'Upload Blob' or the Launcher's later join/download will fail."
+          }
+        },
+        {
+          "name": "Heartbeat",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Agent-Token", "value": "{{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serverId\": \"{{serverId}}\",\n  \"modCount\": 1,\n  \"timestamp\": \"2026-08-02T12:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/agents/heartbeat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "agents", "heartbeat"]
+            },
+            "description": "Sent every 30s-5min by the running agent. Marks the server online/degraded/offline in the registry depending on recency."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Read-only Verification",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "health"]
+            },
+            "description": "Not agent-specific, but useful to confirm the backend is up before running the flows above."
+          }
+        },
+        {
+          "name": "List Agents",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/agents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "agents"]
+            },
+            "description": "Shows online/degraded/offline status per serverId, derived from heartbeat recency."
+          }
+        },
+        {
+          "name": "Manifest History",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/manifests/{{serverId}}/history",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "manifests", "{{serverId}}", "history"]
+            },
+            "description": "All versions ever published for this serverId (B4 versioned manifest store)."
+          }
+        },
+        {
+          "name": "Manifest Diff (latest)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/manifests/{{serverId}}/diff?from=0&to=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "manifests", "{{serverId}}", "diff"],
+              "query": [
+                { "key": "from", "value": "0", "description": "0 = diff against empty (all mods show as Added)" },
+                { "key": "to", "value": "0", "description": "0 = latest version" }
+              ]
+            },
+            "description": "Diffs two manifest versions. Defaults (from=0,to=0) show what changed in the most recent publish."
+          }
+        }
+      ]
+    }
+  ]
+}

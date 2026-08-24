@@ -1,0 +1,259 @@
+{
+  "info": {
+    "name": "PZ Backend — Public & Operator API",
+    "description": "The Backend's Launcher-facing and operator-facing surface (apps/backend). Agent-only ingestion endpoints (register, heartbeat, blob push, manifest push) are NOT duplicated here — see deploy/postman/pz-agent.postman_collection.json for those; this collection only repeats 'Register (bootstrap)' and adds the new self-service 'Revoke' endpoint since it's operator-relevant. Run 'Register (bootstrap)' first if you need a token for the Agent Admin folder.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "serverId", "value": "my-server", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "sha256", "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "type": "string" },
+    { "key": "gameId", "value": "pz", "type": "string" },
+    { "key": "gameVersion", "value": "42.10.1", "type": "string" },
+    { "key": "platform", "value": "windows-x64", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Health & Server Registry",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/health", "host": ["{{baseUrl}}"], "path": ["api", "v1", "health"] }
+          }
+        },
+        {
+          "name": "List Servers",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/servers", "host": ["{{baseUrl}}"], "path": ["api", "v1", "servers"] },
+            "description": "Unauthenticated — this is what the Launcher's server browser calls on startup."
+          }
+        },
+        {
+          "name": "Get Server by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/servers/{{serverId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "servers", "{{serverId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Join & Download (Launcher flow)",
+      "item": [
+        {
+          "name": "Join Server",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/join/{{serverId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "join", "{{serverId}}"]
+            },
+            "description": "Builds a JoinResponse: server record, latest manifest, and a download plan (sha256 + URL per mod). This is what the Launcher's 'Join' button calls. Falls back to an empty download plan if the server's Agent hasn't published a manifest yet."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    console.log('manifestVersion:', body.manifestVersion, 'downloadPlan items:', (body.downloadPlan || []).length);",
+                  "    if (body.downloadPlan && body.downloadPlan.length > 0) {",
+                  "        pm.collectionVariables.set('sha256', body.downloadPlan[0].sha256);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Download Blob",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/download/{{sha256}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "download", "{{sha256}}"]
+            },
+            "description": "Content-addressable blob download, keyed by the sha256 from a Join response's downloadPlan. Unauthenticated by design — content is immutable and identity-verified by the client."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Agent Admin",
+      "item": [
+        {
+          "name": "Register (bootstrap — get a token)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serverId\": \"{{serverId}}\",\n  \"gameVersion\": \"{{gameVersion}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/agents/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "agents", "register"]
+            },
+            "description": "Full agent ingestion flow (heartbeat, blob push, manifest push) lives in the pz-agent collection. This is included here only so you can obtain a {{token}} for testing Revoke below without switching collections."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.token) { pm.collectionVariables.set('token', body.token); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Agents",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/agents", "host": ["{{baseUrl}}"], "path": ["api", "v1", "agents"] },
+            "description": "online/degraded/offline per serverId, derived from heartbeat recency (90s / 5min thresholds)."
+          }
+        },
+        {
+          "name": "Revoke My Own Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "X-Agent-Token", "value": "{{token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/agents/revoke", "host": ["{{baseUrl}}"], "path": ["api", "v1", "agents", "revoke"] },
+            "description": "NEW: self-service revoke. An agent can only revoke the token that authenticated the request — there is no admin endpoint yet to revoke an arbitrary agent's token from an operator UI (would need an admin-auth primitive this codebase doesn't have). After calling this, the token in {{token}} is dead; re-run Register to get a new one."
+          }
+        },
+        {
+          "name": "Manifest History",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/manifests/{{serverId}}/history",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "manifests", "{{serverId}}", "history"]
+            }
+          }
+        },
+        {
+          "name": "Manifest Diff (latest)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/manifests/{{serverId}}/diff?from=0&to=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "manifests", "{{serverId}}", "diff"],
+              "query": [
+                { "key": "from", "value": "0" },
+                { "key": "to", "value": "0" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Content Registry (RFC-0059, community game-binary uploads)",
+      "item": [
+        {
+          "name": "Catalog",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/registry/catalog?game={{gameId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "registry", "catalog"],
+              "query": [{ "key": "game", "value": "{{gameId}}" }]
+            },
+            "description": "Full version catalog for a game — what the Launcher's version-select screen calls on startup."
+          }
+        },
+        {
+          "name": "List Versions (filtered)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/registry/versions?game={{gameId}}&platform={{platform}}&trust=verified",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "registry", "versions"],
+              "query": [
+                { "key": "game", "value": "{{gameId}}" },
+                { "key": "platform", "value": "{{platform}}" },
+                { "key": "trust", "value": "verified" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Submit Hash (step 1)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sha256\": \"{{sha256}}\",\n  \"sizeBytes\": 0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/registry/versions/{{gameId}}/{{gameVersion}}/{{platform}}/submit",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "registry", "versions", "{{gameId}}", "{{gameVersion}}", "{{platform}}", "submit"]
+            },
+            "description": "Trust model: N independent /24-subnet submitters with the same hash → 'verified'. Returns upload_required if the blob isn't stored yet."
+          }
+        },
+        {
+          "name": "Upload Binary (step 2)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "X-Content-SHA256", "value": "{{sha256}}" }],
+            "body": { "mode": "file", "file": { "src": "" } },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/registry/versions/{{gameId}}/{{gameVersion}}/{{platform}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "registry", "versions", "{{gameId}}", "{{gameVersion}}", "{{platform}}"]
+            },
+            "description": "Must submit the hash first (previous request). Attach the actual binary under Body > binary before sending."
+          }
+        },
+        {
+          "name": "Download Registered Binary",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/registry/versions/{{gameId}}/{{gameVersion}}/{{platform}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "registry", "versions", "{{gameId}}", "{{gameVersion}}", "{{platform}}"]
+            },
+            "description": "Rejects with 409 if the version's trust level is 'rejected' (hash conflict)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Ops",
+      "item": [
+        {
+          "name": "Prometheus Metrics",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/metrics", "host": ["{{baseUrl}}"], "path": ["metrics"] }
+          }
+        }
+      ]
+    }
+  ]
+}
