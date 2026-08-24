@@ -105,6 +105,23 @@ func (s *Store) Revoke(serverID string) error {
 	return s.persist()
 }
 
+// AgentInfo describes a registered agent's token state (no secrets).
+type AgentInfo struct {
+	ServerID string `json:"serverId"`
+	HasToken bool   `json:"hasToken"`
+}
+
+// List returns every known agent with whether it currently holds an active token.
+func (s *Store) List() []AgentInfo {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]AgentInfo, 0, len(s.byServer))
+	for id := range s.byServer {
+		out = append(out, AgentInfo{ServerID: id, HasToken: true})
+	}
+	return out
+}
+
 func generateToken() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {

@@ -44,6 +44,7 @@ type options struct {
 	LogFile      string
 	TokensFile   string
 	ManifestsDir string
+	AdminToken   string
 }
 
 func main() {
@@ -57,6 +58,7 @@ func main() {
 	logFile := flag.String("logfile", "", "append logs to this file instead of stderr")
 	tokensFile := flag.String("tokens", "apps/backend/agent-tokens.json", "path to persist agent access tokens (survives restarts)")
 	manifestsDir := flag.String("manifests-dir", "apps/backend/manifests", "directory to persist versioned server manifests (survives restarts)")
+	adminToken := flag.String("admin-token", os.Getenv("PZ_ADMIN_TOKEN"), "operator secret enabling /api/v1/admin/* (also PZ_ADMIN_TOKEN env)")
 	service := flag.String("service", "", "Windows service control: install | uninstall | start | stop")
 	flag.Parse()
 
@@ -71,6 +73,7 @@ func main() {
 		LogFile:      *logFile,
 		TokensFile:   *tokensFile,
 		ManifestsDir: *manifestsDir,
+		AdminToken:   *adminToken,
 	}
 
 	if *service != "" {
@@ -156,7 +159,7 @@ func run(ctx context.Context, o options) error {
 		contentReg, _ = content.NewRegistry("", content.DefaultThreshold)
 	}
 
-	mux := api.NewRouter(reg, baseURL, store, tokens, contentReg)
+	mux := api.NewRouter(reg, baseURL, store, tokens, o.AdminToken, contentReg)
 
 	// Serve deploy assets if -deploy is set.
 	// GET /install-agent.sh  → deploy/install-agent.sh

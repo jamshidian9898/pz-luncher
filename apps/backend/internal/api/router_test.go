@@ -22,7 +22,7 @@ func newTestRouter(t *testing.T) (http.Handler, *auth.Store, *registry.Registry)
 		t.Fatalf("new disk store: %v", err)
 	}
 	tokens := auth.NewStore()
-	mux := NewRouter(reg, "http://localhost:8080", store, tokens, nil)
+	mux := NewRouter(reg, "http://localhost:8080", store, tokens, "", nil)
 	return mux, tokens, reg
 }
 

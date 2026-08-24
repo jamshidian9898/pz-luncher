@@ -69,6 +69,64 @@ export async function fetchDiff(serverId: string, from: number, to: number): Pro
   return r.json()
 }
 
+export interface BlobInfo {
+  sha256: string
+  sizeBytes: number
+  sourceServer?: string
+  firstSeenAt?: string
+}
+
+export interface BlobList {
+  blobs: BlobInfo[]
+  count: number
+  totalBytes: number
+}
+
+export async function fetchBlobs(): Promise<BlobList> {
+  const r = await fetch(`${BASE}/blobs`)
+  if (!r.ok) throw new Error('content store unavailable')
+  return r.json()
+}
+
+export interface TokenState {
+  serverId: string
+  agentStatus?: string
+  hasToken: boolean
+}
+
+export async function fetchTokens(adminToken: string): Promise<TokenState[]> {
+  const r = await fetch(`${BASE}/admin/tokens`, {
+    headers: { 'X-Admin-Token': adminToken },
+  })
+  if (!r.ok) {
+    const body = await r.json().catch(() => null)
+    throw new Error(body?.error?.message ?? `admin API error ${r.status}`)
+  }
+  const d = await r.json()
+  return d.tokens ?? []
+}
+
+export async function issueToken(adminToken: string, serverId: string): Promise<string> {
+  const r = await fetch(`${BASE}/admin/tokens/${serverId}`, {
+    method: 'POST',
+    headers: { 'X-Admin-Token': adminToken },
+  })
+  const body = await r.json().catch(() => null)
+  if (!r.ok) throw new Error(body?.error?.message ?? `token issue failed (${r.status})`)
+  return body.token
+}
+
+export async function revokeToken(adminToken: string, serverId: string): Promise<void> {
+  const r = await fetch(`${BASE}/admin/tokens/${serverId}`, {
+    method: 'DELETE',
+    headers: { 'X-Admin-Token': adminToken },
+  })
+  if (!r.ok) {
+    const body = await r.json().catch(() => null)
+    throw new Error(body?.error?.message ?? `revoke failed (${r.status})`)
+  }
+}
+
 export interface PlatformMetrics {
   joinTotal: number
   joinDurationP50: number | null

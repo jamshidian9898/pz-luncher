@@ -2,6 +2,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,13 +26,15 @@ import (
 // baseURL is the public base URL of this Backend instance (e.g. "http://localhost:8080").
 // store is the content-addressable blob store; may be nil (download will 503).
 // tokens is the agent auth store; may be nil (auth disabled — dev only).
+// adminToken guards /api/v1/admin/* routes; empty disables them.
 // contentReg is the Content Registry (RFC-0059); may be nil (registry routes disabled).
-func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, tokens *auth.Store, contentReg *content.Registry) http.Handler {
+func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, tokens *auth.Store, adminToken string, contentReg *content.Registry) http.Handler {
 	mux := http.NewServeMux()
 
 	registerRegistryRoutes(mux, store, contentReg)
 
 	agentAuth := requireAgentToken(tokens)
+	adminAuth := requireAdminToken(adminToken)
 
 	resolver := join.NewResolver(reg, baseURL, store)
 
@@ -404,6 +407,67 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 		writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "serverId": serverID})
 	}))
 
+	// ── Admin: agent enrollment tokens (RFC-0057) ──
+
+	// List token state — GET /api/v1/admin/tokens
+	mux.HandleFunc("GET /api/v1/admin/tokens", adminAuth(func(w http.ResponseWriter, _ *http.Request) {
+		type entry struct {
+			ServerID    string `json:"serverId"`
+			HasToken    bool   `json:"hasToken"`
+			AgentStatus string `json:"agentStatus,omitempty"`
+		}
+		var out []entry
+		seen := map[string]bool{}
+		if tokens != nil {
+			for _, a := range tokens.List() {
+				seen[a.ServerID] = true
+				e := entry{ServerID: a.ServerID, HasToken: true}
+				if ag := reg.AgentStateFor(a.ServerID); ag != nil {
+					e.AgentStatus = string(ag.Status)
+				}
+				out = append(out, e)
+			}
+		}
+		for _, a := range reg.ListAgents() {
+			if !seen[a.ServerID] {
+				out = append(out, entry{ServerID: a.ServerID})
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{"tokens": out})
+	}))
+
+	// Issue (or rotate) an agent token — POST /api/v1/admin/tokens/{serverId}
+	mux.HandleFunc("POST /api/v1/admin/tokens/{serverId}", adminAuth(func(w http.ResponseWriter, r *http.Request) {
+		if tokens == nil {
+			writeError(w, http.StatusServiceUnavailable, "AUTH_DISABLED", "auth is disabled (-no-auth)")
+			return
+		}
+		serverID := r.PathValue("serverId")
+		token, err := tokens.Register(serverID)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "TOKEN_ISSUE_ERROR", err.Error())
+			return
+		}
+		reg.RecordHeartbeat(serverID, 0, "")
+		obs.Log(r.Context(), "admin.token_issued", "server_id", serverID)
+		writeJSON(w, http.StatusCreated, map[string]string{"serverId": serverID, "token": token})
+	}))
+
+	// Revoke an agent token — DELETE /api/v1/admin/tokens/{serverId}
+	mux.HandleFunc("DELETE /api/v1/admin/tokens/{serverId}", adminAuth(func(w http.ResponseWriter, r *http.Request) {
+		if tokens == nil {
+			writeError(w, http.StatusServiceUnavailable, "AUTH_DISABLED", "auth is disabled (-no-auth)")
+			return
+		}
+		serverID := r.PathValue("serverId")
+		if err := tokens.Revoke(serverID); err != nil {
+			writeError(w, http.StatusInternalServerError, "REVOKE_ERROR", err.Error())
+			return
+		}
+		obs.Log(r.Context(), "admin.token_revoked", "server_id", serverID)
+		writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "serverId": serverID})
+	}))
+
 	return cors(mux)
 }
 
@@ -470,6 +534,30 @@ func requireAgentToken(tokens *auth.Store) func(http.HandlerFunc) http.HandlerFu
 			if _, ok := tokens.Validate(token); !ok {
 				writeError(w, http.StatusUnauthorized, "AGENT_UNAUTHORIZED",
 					"missing or invalid "+auth.TokenHeader)
+				return
+			}
+			next(w, r)
+		}
+	}
+}
+
+// AdminTokenHeader is the header operator requests must include for
+// /api/v1/admin/* routes.
+const AdminTokenHeader = "X-Admin-Token"
+
+// requireAdminToken guards admin routes with a shared operator secret.
+// An empty expected token disables the route group entirely (503).
+func requireAdminToken(expected string) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if expected == "" {
+				writeError(w, http.StatusServiceUnavailable, "ADMIN_NOT_CONFIGURED",
+					"admin API disabled; start backend with -admin-token to enable it")
+				return
+			}
+			if subtle.ConstantTimeCompare([]byte(r.Header.Get(AdminTokenHeader)), []byte(expected)) != 1 {
+				writeError(w, http.StatusUnauthorized, "ADMIN_UNAUTHORIZED",
+					"missing or invalid "+AdminTokenHeader)
 				return
 			}
 			next(w, r)
