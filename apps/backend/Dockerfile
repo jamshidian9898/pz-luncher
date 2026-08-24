@@ -1,6 +1,11 @@
 # Stage 1 — build
 FROM golang:1.23-alpine AS builder
 
+# proxy.golang.org 403s github.com/wailsapp/mimetype; fetch it directly from GitHub
+ENV GOPRIVATE=github.com/wailsapp/mimetype
+
+RUN apk add --no-cache git
+
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
