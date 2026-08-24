@@ -42,7 +42,8 @@ build-mac: build-ui
 	mkdir -p $(DIST_DIR)
 	cd $(APP_DIR) && \
 		CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
-		go build -tags desktop -ldflags="-s -w -X main.Version=$(VERSION)" \
+		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
+		go build -tags desktop,production -ldflags="-s -w -X main.Version=$(VERSION)" \
 		-o ../../$(DIST_DIR)/$(APP_NAME)-mac-arm64 .
 	@echo "✓ macOS arm64 → $(DIST_DIR)/$(APP_NAME)-mac-arm64"
 
@@ -50,7 +51,8 @@ build-mac-intel: build-ui
 	mkdir -p $(DIST_DIR)
 	cd $(APP_DIR) && \
 		CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
-		go build -tags desktop -ldflags="-s -w -X main.Version=$(VERSION)" \
+		CGO_LDFLAGS="-framework UniformTypeIdentifiers" \
+		go build -tags desktop,production -ldflags="-s -w -X main.Version=$(VERSION)" \
 		-o ../../$(DIST_DIR)/$(APP_NAME)-mac-amd64 .
 	@echo "✓ macOS amd64 → $(DIST_DIR)/$(APP_NAME)-mac-amd64"
 
@@ -58,7 +60,7 @@ build-windows: build-ui
 	mkdir -p $(DIST_DIR)
 	cd $(APP_DIR) && \
 		CGO_ENABLED=1 GOOS=windows GOARCH=amd64 \
-		go build -tags desktop -ldflags="-s -w -H windowsgui -X main.Version=$(VERSION)" \
+		go build -tags desktop,production -ldflags="-s -w -H windowsgui -X main.Version=$(VERSION)" \
 		-o ../../$(DIST_DIR)/$(APP_NAME)-windows-amd64.exe .
 	@echo "✓ Windows amd64 → $(DIST_DIR)/$(APP_NAME)-windows-amd64.exe"
 
@@ -66,7 +68,7 @@ build-linux: build-ui
 	mkdir -p $(DIST_DIR)
 	cd $(APP_DIR) && \
 		CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-		go build -tags desktop -ldflags="-s -w -X main.Version=$(VERSION)" \
+		go build -tags desktop,production -ldflags="-s -w -X main.Version=$(VERSION)" \
 		-o ../../$(DIST_DIR)/$(APP_NAME)-linux-amd64 .
 	@echo "✓ Linux amd64 → $(DIST_DIR)/$(APP_NAME)-linux-amd64"
 

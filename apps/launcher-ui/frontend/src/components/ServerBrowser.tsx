@@ -119,21 +119,19 @@ export function ServerBrowser({ onJoin, onLaunch }: ServerBrowserProps) {
             
             if (details) {
               return (
-                <DetailPanel 
-                  details={details} 
+                <DetailPanel
+                  details={details}
                   onJoin={() => onJoin(selectedServer)}
                   onLaunch={onLaunch ? () => onLaunch(selectedServer) : undefined}
-                  onManage={() => {/* TODO: Open manage modal */ alert('Manage server: ' + selectedServer.name)}}
                 />
               );
             }
-            
+
             return (
               <DetailPanelFallback
                 server={selectedServer}
                 onJoin={() => onJoin(selectedServer)}
                 onLaunch={onLaunch ? () => onLaunch(selectedServer) : undefined}
-                onManage={() => {/* TODO: Open manage modal */ alert('Manage server: ' + selectedServer.name)}}
               />
             );
           })()
@@ -279,7 +277,7 @@ function ServerCard({ server, selected, favorite, onSelect, onFavorite, onJoin, 
 }
 
 /* ── Detail Panel ── */
-function DetailPanel({ details, onJoin, onLaunch, onManage }: { details: ServerDetails; onJoin: () => void; onLaunch?: () => void; onManage?: () => void }) {
+function DetailPanel({ details, onJoin, onLaunch }: { details: ServerDetails; onJoin: () => void; onLaunch?: () => void }) {
   const totalMB = ((details.totalSize || 0) / 1024 / 1024).toFixed(0);
   const status = useServerStatus(details.id);
   const mods = details.mods || [];
@@ -299,7 +297,6 @@ function DetailPanel({ details, onJoin, onLaunch, onManage }: { details: ServerD
           serverId={details.id}
           onJoin={onJoin}
           onLaunch={onLaunch}
-          onManage={onManage}
         />
       </div>
 
@@ -341,7 +338,7 @@ function DetailPanel({ details, onJoin, onLaunch, onManage }: { details: ServerD
 }
 
 /* ── Server Action Button Helper ── */
-function ServerActionButton({ serverId, onJoin, onLaunch, onManage }: { serverId: string; onJoin: () => void; onLaunch?: () => void; onManage?: () => void }) {
+function ServerActionButton({ serverId, onJoin, onLaunch }: { serverId: string; onJoin: () => void; onLaunch?: () => void }) {
   const status = useServerStatus(serverId);
   const currentServer = useSessionStore(s => s.currentServer);
   const launchState = useSessionStore(s => s.launchState);
@@ -359,14 +356,6 @@ function ServerActionButton({ serverId, onJoin, onLaunch, onManage }: { serverId
         >
           <Loader2 size={16} className="animate-spin" /> Downloading...
         </button>
-        {onManage && (
-          <button
-            onClick={onManage}
-            className="shrink-0 flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm font-medium transition-colors"
-          >
-            Manage
-          </button>
-        )}
       </div>
     );
   }
@@ -381,14 +370,6 @@ function ServerActionButton({ serverId, onJoin, onLaunch, onManage }: { serverId
         >
           <Gamepad2 size={16} /> Playing
         </button>
-        {onManage && (
-          <button
-            onClick={onManage}
-            className="shrink-0 flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm font-medium transition-colors"
-          >
-            Manage
-          </button>
-        )}
       </div>
     );
   }
@@ -408,14 +389,6 @@ function ServerActionButton({ serverId, onJoin, onLaunch, onManage }: { serverId
         >
           <Play size={16} /> {isAnotherServerRunning ? 'Another Game Running' : 'Launch Game'}
         </button>
-        {onManage && (
-          <button
-            onClick={onManage}
-            className="shrink-0 flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm font-medium transition-colors"
-          >
-            Manage
-          </button>
-        )}
       </div>
     );
   }
@@ -435,14 +408,6 @@ function ServerActionButton({ serverId, onJoin, onLaunch, onManage }: { serverId
         >
           <Download size={16} /> {isAnotherServerRunning ? 'Game Running' : 'Update Mods'}
         </button>
-        {onManage && (
-          <button
-            onClick={onManage}
-            className="shrink-0 flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm font-medium transition-colors"
-          >
-            Manage
-          </button>
-        )}
       </div>
     );
   }
@@ -466,7 +431,7 @@ function ServerActionButton({ serverId, onJoin, onLaunch, onManage }: { serverId
 }
 
 /* ── Detail Panel Fallback (when details API fails) ── */
-function DetailPanelFallback({ server, onJoin, onLaunch, onManage }: { server: ServerInfo; onJoin: () => void; onLaunch?: () => void; onManage?: () => void }) {
+function DetailPanelFallback({ server, onJoin, onLaunch }: { server: ServerInfo; onJoin: () => void; onLaunch?: () => void }) {
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-5">
       <div className="flex items-start justify-between gap-4">
@@ -478,7 +443,6 @@ function DetailPanelFallback({ server, onJoin, onLaunch, onManage }: { server: S
           serverId={server.id}
           onJoin={onJoin}
           onLaunch={onLaunch}
-          onManage={onManage}
         />
       </div>
 

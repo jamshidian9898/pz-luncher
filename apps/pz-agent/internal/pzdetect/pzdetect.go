@@ -9,16 +9,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
 // Result holds the auto-detected PZ server information.
 type Result struct {
-	ServerName string // e.g. "servertest" from ServerName.ini
-	ModsDir    string // path to Workshop mods directory
-	ZomboidDir string // base Zomboid user directory
-	PID        string // process ID of the running server
+	ServerName  string // e.g. "servertest" from ServerName.ini
+	ModsDir     string // path to Workshop mods directory
+	ZomboidDir  string // base Zomboid user directory
+	PID         string // process ID of the running server
+	GameVersion string // e.g. "42.8.0", "unknown" if undetectable
+	MaxPlayers  int    // from server .ini MaxPlayers=, 0 if undetectable
 }
 
 // Detect attempts to find a running PZ dedicated server and its configuration.
@@ -44,10 +48,12 @@ func Detect() *Result {
 	}
 
 	return &Result{
-		ServerName: serverName,
-		ModsDir:    modsDir,
-		ZomboidDir: zomboidDir,
-		PID:        pid,
+		ServerName:  serverName,
+		ModsDir:     modsDir,
+		ZomboidDir:  zomboidDir,
+		PID:         pid,
+		GameVersion: detectGameVersion(pid),
+		MaxPlayers:  detectMaxPlayers(filepath.Join(zomboidDir, "Server"), serverName),
 	}
 }
 
@@ -290,6 +296,119 @@ func parseModsFromINI(serverDir string) string {
 						return dirs[0]
 					}
 				}
+			}
+		}
+	}
+	return ""
+}
+
+// detectMaxPlayers reads MaxPlayers= from the server's .ini file.
+// Returns 0 if the setting is absent or unparsable.
+func detectMaxPlayers(serverDir, serverName string) int {
+	if !dirExists(serverDir) {
+		return 0
+	}
+	iniPath := filepath.Join(serverDir, serverName+".ini")
+	f, err := os.Open(iniPath)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "MaxPlayers=") {
+			v := strings.TrimSpace(strings.TrimPrefix(line, "MaxPlayers="))
+			n, err := strconv.Atoi(v)
+			if err == nil && n > 0 {
+				return n
+			}
+		}
+	}
+	return 0
+}
+
+// versionFileNames are checked, in order, inside a candidate install directory.
+var versionFileNames = []string{".pz-version", "version.txt"}
+
+// dirVersionRe extracts a version token from a path component such as
+// "ProjectZomboid-42.16.3" or "pzserver-42.8".
+var dirVersionRe = regexp.MustCompile(`(?i)(?:ProjectZomboid|PZ)[-_\s]?v?(\d+(?:\.\d+)*\w*)`)
+
+// fallbackVersionRe matches any bare version-looking token as a last resort.
+var fallbackVersionRe = regexp.MustCompile(`(\d+(?:\.\d+){1,3})`)
+
+// detectGameVersion tries to determine the installed PZ dedicated server
+// version by locating the server's install directory (via the running
+// process) and checking it for known version markers. Returns "unknown"
+// if no marker is found — never a guessed/hardcoded default.
+func detectGameVersion(pid string) string {
+	gamePath := detectGamePath(pid)
+	if gamePath == "" {
+		return "unknown"
+	}
+	return detectGameVersionFromPath(gamePath)
+}
+
+// detectGameVersionFromPath applies the same heuristics used elsewhere in
+// the launcher (see apps/launcher-ui/contribute.go detectGameVersion) to a
+// dedicated-server install directory.
+func detectGameVersionFromPath(gamePath string) string {
+	for _, name := range versionFileNames {
+		if data, err := os.ReadFile(filepath.Join(gamePath, name)); err == nil {
+			if v := strings.TrimSpace(string(data)); v != "" {
+				return v
+			}
+		}
+	}
+
+	parts := strings.Split(filepath.ToSlash(gamePath), "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if m := dirVersionRe.FindStringSubmatch(parts[i]); len(m) > 1 {
+			return m[1]
+		}
+	}
+	for i := len(parts) - 1; i >= 0; i-- {
+		if m := fallbackVersionRe.FindStringSubmatch(parts[i]); len(m) > 1 {
+			return m[1]
+		}
+	}
+	return "unknown"
+}
+
+// detectGamePath resolves the working/install directory of the running PZ
+// server process identified by pid. Returns "" if it cannot be determined
+// (e.g. no process running, or platform tooling unavailable).
+func detectGamePath(pid string) string {
+	if pid == "" {
+		return ""
+	}
+	if runtime.GOOS == "windows" {
+		return detectGamePathWindows(pid)
+	}
+	return detectGamePathUnix(pid)
+}
+
+func detectGamePathUnix(pid string) string {
+	// /proc/<pid>/cwd is the most reliable source on Linux.
+	if link, err := os.Readlink(filepath.Join("/proc", pid, "cwd")); err == nil && link != "" {
+		return link
+	}
+	return ""
+}
+
+func detectGamePathWindows(pid string) string {
+	out, err := exec.Command("wmic", "process", "where", "ProcessId="+pid, "get", "ExecutablePath", "/value").Output()
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "ExecutablePath=") {
+			exe := strings.TrimSpace(strings.TrimPrefix(line, "ExecutablePath="))
+			if exe != "" {
+				return filepath.Dir(exe)
 			}
 		}
 	}

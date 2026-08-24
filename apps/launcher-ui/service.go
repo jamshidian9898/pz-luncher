@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"pzlauncher/libs/pipeline"
 	"pzlauncher/libs/settings"
 	"pzlauncher/libs/sharedtypes"
+	"pzlauncher/libs/ziputil"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -65,6 +68,16 @@ func (s *UIService) ReloadConfig() {
 	s.workspaceRoot = root
 	s.pipeline = pipeline.NewService(settings.ToPipelineConfig(root, st))
 	s.mu.Unlock()
+}
+
+// getPipeline returns the current pipeline under lock. SaveSettings and
+// ReloadConfig can both replace s.pipeline at any time (e.g. a user editing
+// Settings while a join/launch is in flight), so every read must go through
+// this instead of touching s.pipeline directly.
+func (s *UIService) getPipeline() *pipeline.Service {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.pipeline
 }
 
 // SetContext sets Wails context for events
@@ -213,7 +226,7 @@ func (s *UIService) JoinServer(serverID string) error {
 			return
 		}
 
-		result, err := s.pipeline.RunJoinFromBackend(ctx, jr, emit)
+		result, err := s.getPipeline().RunJoinFromBackend(ctx, jr, emit)
 		s.mu.Lock()
 		if err != nil {
 			s.mu.Unlock()
@@ -242,7 +255,7 @@ func (s *UIService) LaunchServer(serverID string) error {
 			return fmt.Errorf("LAUNCH_PROFILE_NOT_READY: no join session for server %s", serverID)
 		}
 		go func() {
-			_ = s.pipeline.LaunchFromBackend(context.Background(), jr.Manifest.ServerID, join.ProfilePath, *jr, s.pipelineEmit())
+			_ = s.getPipeline().LaunchFromBackend(context.Background(), jr.Manifest.ServerID, join.ProfilePath, *jr, s.pipelineEmit())
 		}()
 		return nil
 	}
@@ -251,7 +264,7 @@ func (s *UIService) LaunchServer(serverID string) error {
 		return fmt.Errorf("LAUNCH_PROFILE_NOT_READY: no join session for server %s", serverID)
 	}
 	go func() {
-		_ = s.pipeline.Launch(context.Background(), serverID, join.ProfilePath, s.pipelineEmit())
+		_ = s.getPipeline().Launch(context.Background(), serverID, join.ProfilePath, s.pipelineEmit())
 	}()
 	return nil
 }
@@ -387,12 +400,78 @@ func (s *UIService) GetSessionStatus(sessionID string) (*SessionStatus, error) {
 	return &SessionStatus{SessionID: sessionID, State: "idle", Progress: 0}, nil
 }
 
-// RepairCache mocks cache repair
+// RepairCache verifies every cached mod's content against its own directory
+// name (the mods cache is content-addressed by SHA256 — see cache.go) and
+// removes any entry whose actual content no longer matches, so the next
+// join/launch re-downloads it instead of using corrupted data.
+//
+// Cached game versions aren't content-addressed (keyed by version string, not
+// hash), so there's no hash to verify them against; a version directory is
+// only removed here if it's empty (a clearly-failed/incomplete download).
 func (s *UIService) RepairCache() error {
+	root := s.getWorkspaceRoot()
 	s.emitEvent(UIEvent{Type: EventCacheRepairStart, Timestamp: time.Now().Unix()})
-	time.Sleep(500 * time.Millisecond)
-	s.emitEvent(UIEvent{Type: EventCacheRepairComplete, Timestamp: time.Now().Unix()})
+
+	checked, repaired := 0, 0
+	var freedBytes int64
+
+	modsDir := filepath.Join(root, "mods")
+	if entries, err := os.ReadDir(modsDir); err == nil {
+		total := len(entries)
+		for i, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			checked++
+			modPath := filepath.Join(modsDir, e.Name())
+			s.emitEvent(UIEvent{
+				Type:      EventCacheRepairProgress,
+				Timestamp: time.Now().Unix(),
+				PackageID: e.Name(),
+				Progress:  &Progress{Current: int64(i + 1), Total: int64(total)},
+			})
+
+			gotHash, size, err := ziputil.HashDir(modPath)
+			if err != nil || gotHash != e.Name() {
+				if err := os.RemoveAll(modPath); err == nil {
+					repaired++
+					freedBytes += size
+				}
+			}
+		}
+	}
+
+	versionsDir := filepath.Join(root, "versions")
+	if entries, err := os.ReadDir(versionsDir); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			versionPath := filepath.Join(versionsDir, e.Name())
+			checked++
+			if isDirEmpty(versionPath) {
+				if err := os.RemoveAll(versionPath); err == nil {
+					repaired++
+				}
+			}
+		}
+	}
+
+	s.emitEvent(UIEvent{
+		Type:      EventCacheRepairComplete,
+		Timestamp: time.Now().Unix(),
+		Metadata: map[string]interface{}{
+			"checked":    checked,
+			"repaired":   repaired,
+			"freedBytes": freedBytes,
+		},
+	})
 	return nil
+}
+
+func isDirEmpty(path string) bool {
+	entries, err := os.ReadDir(path)
+	return err != nil || len(entries) == 0
 }
 
 // HealthStatus holds result of a single health check
@@ -497,7 +576,9 @@ func (s *UIService) SaveSettings(ui Settings) error {
 		return err
 	}
 	settings.ApplyGamePathEnv(st)
+	s.mu.Lock()
 	s.pipeline = pipeline.NewService(settings.ToPipelineConfig(root, st))
+	s.mu.Unlock()
 	return nil
 }
 
@@ -543,6 +624,7 @@ const (
 	EventError               UIEventType = "error"
 	EventTraceUpdated        UIEventType = "trace.updated"
 	EventCacheRepairStart    UIEventType = "cache.repair.start"
+	EventCacheRepairProgress UIEventType = "cache.repair.progress"
 	EventCacheRepairComplete UIEventType = "cache.repair.complete"
 )
 

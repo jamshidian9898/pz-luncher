@@ -168,7 +168,7 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 			if gv == "" {
 				gv = "42.8"
 			}
-			reg.Upsert(&registry.ServerRecord{
+			if err := reg.Upsert(&registry.ServerRecord{
 				ID:          req.ServerID,
 				Name:        name,
 				Description: "Auto-registered by agent",
@@ -176,7 +176,9 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 				MaxPlayers:  64,
 				Status:      "online",
 				Tags:        []string{"auto"},
-			})
+			}); err != nil {
+				obs.LogError(r.Context(), "agent.server_persist_failed", "server_id", req.ServerID, "error", err)
+			}
 			obs.Log(r.Context(), "agent.server_auto_created", "server_id", req.ServerID)
 		}
 
@@ -341,6 +343,30 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 			"at", hbBody.Timestamp,
 		)
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "serverTime": time.Now().UTC().Format(time.RFC3339)})
+	}))
+
+	// Agent self-revoke — POST /api/v1/agents/revoke (auth A6)
+	// An Agent can only revoke its OWN token (the one that authenticated this
+	// request) — e.g. on graceful decommission. There is no admin-token
+	// primitive in this codebase yet to support revoking an arbitrary agent's
+	// token from an operator UI; that's a separate, larger piece of work.
+	mux.HandleFunc("POST /api/v1/agents/revoke", agentAuth(func(w http.ResponseWriter, r *http.Request) {
+		if tokens == nil {
+			writeError(w, http.StatusServiceUnavailable, "AUTH_DISABLED", "auth is disabled (-no-auth); nothing to revoke")
+			return
+		}
+		serverID, ok := tokens.Validate(r.Header.Get(auth.TokenHeader))
+		if !ok {
+			// requireAgentToken already validated this; unreachable in practice.
+			writeError(w, http.StatusUnauthorized, "AGENT_UNAUTHORIZED", "missing or invalid "+auth.TokenHeader)
+			return
+		}
+		if err := tokens.Revoke(serverID); err != nil {
+			writeError(w, http.StatusInternalServerError, "REVOKE_ERROR", err.Error())
+			return
+		}
+		obs.Log(r.Context(), "agent.revoked", "server_id", serverID)
+		writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "serverId": serverID})
 	}))
 
 	return cors(mux)

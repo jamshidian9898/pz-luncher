@@ -8,7 +8,12 @@ export function ContributePanel() {
   useEffect(() => {
     load();
 
-    // Listen for hashing/upload progress events from Go
+    // Listen for hashing/upload progress events from Go. window.runtime is
+    // only injected inside a Wails webview — guard so this component doesn't
+    // crash when rendered in a plain browser (vite dev, tests, storybook).
+    if (typeof window === 'undefined' || !window.runtime) {
+      return;
+    }
     const off = window.runtime.EventsOn('contribute:event', (data: unknown) => {
       const d = data as { type: string; percent: number; version?: string };
       // Progress events update the currently-active entry

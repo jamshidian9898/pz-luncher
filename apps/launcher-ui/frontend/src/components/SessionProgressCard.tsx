@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useSessionStore } from '../stores/session.store';
 import { useDownloadsStore } from '../stores/downloads.store';
 import { CheckCircle, Loader2, AlertCircle, Play, RefreshCw, Wrench, Square } from 'lucide-react';
@@ -31,13 +32,28 @@ interface SessionProgressCardProps {
   onLaunch?: () => void;
   onStop?: () => void;
   onRetry?: () => void;
-  onRepairCache?: () => void;
+  onRepairCache?: () => Promise<void>;
 }
 
 export function SessionProgressCard({ onLaunch, onStop, onRetry, onRepairCache }: SessionProgressCardProps) {
   const launchState   = useSessionStore(s => s.launchState);
   const currentServer = useSessionStore(s => s.currentServer);
   const sessionId     = useSessionStore(s => s.currentSessionId);
+  const [repairStatus, setRepairStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
+
+  const handleRepairClick = async () => {
+    if (!onRepairCache || repairStatus === 'running') return;
+    setRepairStatus('running');
+    try {
+      await onRepairCache();
+      setRepairStatus('done');
+    } catch (err) {
+      console.error('Cache repair failed:', err);
+      setRepairStatus('error');
+    } finally {
+      setTimeout(() => setRepairStatus('idle'), 4000);
+    }
+  };
 
   const session = useDownloadsStore(s =>
     sessionId ? s.sessions.get(sessionId) : undefined
@@ -184,10 +200,19 @@ export function SessionProgressCard({ onLaunch, onStop, onRetry, onRepairCache }
             )}
             {onRepairCache && (
               <button
-                onClick={onRepairCache}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs font-medium transition-colors"
+                onClick={handleRepairClick}
+                disabled={repairStatus === 'running'}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-60 text-slate-200 rounded-lg text-xs font-medium transition-colors"
               >
-                <Wrench size={12} /> Repair Cache
+                {repairStatus === 'running' ? (
+                  <><Loader2 size={12} className="animate-spin" /> Repairing…</>
+                ) : repairStatus === 'done' ? (
+                  <><CheckCircle size={12} className="text-emerald-400" /> Repaired</>
+                ) : repairStatus === 'error' ? (
+                  <><AlertCircle size={12} className="text-red-400" /> Repair failed</>
+                ) : (
+                  <><Wrench size={12} /> Repair Cache</>
+                )}
               </button>
             )}
           </div>

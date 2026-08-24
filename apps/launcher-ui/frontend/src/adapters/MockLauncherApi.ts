@@ -85,6 +85,10 @@ export class MockLauncherApi implements LauncherApi {
     return { sessionId, state: 'complete', progress: 100 };
   }
 
+  async repairCache(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 300));
+  }
+
   private simulateMockSession(serverId: string) {
     const sessionId = `session-${Date.now()}`;
     const emit = (event: LauncherEvent) => mockEventBus.emit(event);

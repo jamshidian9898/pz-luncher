@@ -5,6 +5,6 @@ export const isWails = (): boolean =>
   typeof (window as any).go !== 'undefined' &&
   (window as any).go?.main?.App != null;
 
-export const launcherApi = createLauncherApi(true);
-export const eventsApi = createEventsApi(true);
-export const settingsApi = createSettingsApi(true);
+export const launcherApi = createLauncherApi(isWails());
+export const eventsApi = createEventsApi(isWails());
+export const settingsApi = createSettingsApi(isWails());

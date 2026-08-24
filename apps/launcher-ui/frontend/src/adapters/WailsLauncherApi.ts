@@ -29,4 +29,8 @@ export class WailsLauncherApi implements LauncherApi {
   async getSessionStatus(sessionId: string): Promise<SessionStatus> {
     return window.go.main.App.GetSessionStatus(sessionId);
   }
+
+  async repairCache(): Promise<void> {
+    return window.go.main.App.RepairCache();
+  }
 }

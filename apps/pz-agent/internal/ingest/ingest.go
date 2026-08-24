@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -17,6 +18,11 @@ import (
 	"pzlauncher/apps/pz-agent/internal/retry"
 	"pzlauncher/libs/ziputil"
 )
+
+// ErrUnauthorized is returned (wrapped) when the Backend rejects a request
+// with 401 — the token is missing, expired, or revoked. Callers should
+// re-register and retry with the fresh token.
+var ErrUnauthorized = errors.New("agent: unauthorized (token missing or revoked)")
 
 // Client publishes content to a Backend instance.
 type Client struct {
@@ -52,12 +58,16 @@ func (c *Client) WithServerName(name string) *Client {
 
 // Register calls POST /api/v1/agents/register and returns the issued token.
 // Retried with DefaultPolicy — a backend restart should not prevent enrollment.
-func (c *Client) Register(ctx context.Context) (string, error) {
+// gameVersion is optional (empty = omitted); the backend defaults it when absent.
+func (c *Client) Register(ctx context.Context, gameVersion string) (string, error) {
 	var token string
 	err := retry.DefaultPolicy.Do(ctx, "register", log.Printf, func() error {
 		regBody := map[string]string{"serverId": c.serverID}
 		if c.serverName != "" {
 			regBody["serverName"] = c.serverName
+		}
+		if gameVersion != "" && gameVersion != "unknown" {
+			regBody["gameVersion"] = gameVersion
 		}
 		body, _ := json.Marshal(regBody)
 		url := fmt.Sprintf("%s/api/v1/agents/register", c.backendURL)
@@ -129,6 +139,9 @@ func (c *Client) PushBlob(ctx context.Context, mod discover.Mod) error {
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusNoContent {
 			return nil
 		}
+		if resp.StatusCode == http.StatusUnauthorized {
+			return retry.Permanent(ErrUnauthorized)
+		}
 		body, _ := io.ReadAll(resp.Body)
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
 			return retry.Permanent(fmt.Errorf("backend %s: %s", resp.Status, body))
@@ -147,6 +160,7 @@ func (c *Client) PublishManifest(ctx context.Context, mods []discover.Mod, gameV
 		Version      string   `json:"version"`
 		SHA256       string   `json:"sha256"`
 		SizeBytes    int64    `json:"sizeBytes,omitempty"`
+		WorkshopID   string   `json:"workshopId,omitempty"`
 		Dependencies []string `json:"dependencies"`
 	}
 	type manifest struct {
@@ -166,6 +180,7 @@ func (c *Client) PublishManifest(ctx context.Context, mods []discover.Mod, gameV
 			Version:      m.Version,
 			SHA256:       m.SHA256,
 			SizeBytes:    m.SizeBytes,
+			WorkshopID:   m.WorkshopID,
 			Dependencies: []string{},
 		})
 	}
@@ -199,6 +214,9 @@ func (c *Client) PublishManifest(ctx context.Context, mods []discover.Mod, gameV
 		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
 			return nil
+		}
+		if resp.StatusCode == http.StatusUnauthorized {
+			return retry.Permanent(ErrUnauthorized)
 		}
 		b, _ := io.ReadAll(resp.Body)
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
@@ -234,6 +252,9 @@ func (c *Client) Heartbeat(ctx context.Context, modCount int) error {
 			return fmt.Errorf("heartbeat: %w", err)
 		}
 		resp.Body.Close()
+		if resp.StatusCode == http.StatusUnauthorized {
+			return retry.Permanent(ErrUnauthorized)
+		}
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 			return fmt.Errorf("heartbeat: backend returned %s", resp.Status)
 		}

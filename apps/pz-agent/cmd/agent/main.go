@@ -34,9 +34,10 @@ func main() {
 	serverID := flag.String("server", "", "server ID (auto-detected if omitted)")
 	backendURL := flag.String("backend", "http://localhost:8080", "backend base URL")
 	modsDir := flag.String("mods", "", "local mods directory to scan (auto-detected if omitted)")
-	gameVersion := flag.String("game-version", "42.8", "game version string")
+	gameVersion := flag.String("game-version", "", "game version string (auto-detected from the running server if omitted)")
 	interval := flag.Duration("interval", 5*time.Minute, "sync interval (0 = run once and exit)")
 	token := flag.String("token", "", "agent auth token (or set PZ_AGENT_TOKEN env var)")
+	tokenDir := flag.String("token-dir", "", "directory to persist the agent access token in (default: OS config dir)")
 	logFile := flag.String("logfile", "", "append logs to this file instead of stderr")
 	service := flag.String("service", "", "Windows service control: install | uninstall | start | stop")
 	serviceName := flag.String("service-name", defaultServiceName, "Windows service name (set when running multiple agents on one host)")
@@ -48,6 +49,7 @@ func main() {
 		ModsDir:     *modsDir,
 		GameVersion: *gameVersion,
 		Token:       *token,
+		TokenDir:    *tokenDir,
 		Interval:    *interval,
 		LogFile:     *logFile,
 		ServiceName: *serviceName,

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -49,6 +50,7 @@ type Registry struct {
 	servers   map[string]*ServerRecord
 	manifests *manifest.Store        // versioned manifest store (B4)
 	agents    map[string]*AgentState // serverID → agent liveness
+	filePath  string                 // "" = no write-back (in-memory only)
 }
 
 type registryFile struct {
@@ -65,6 +67,9 @@ func NewMemoryRegistry() *Registry {
 }
 
 // LoadFromFile reads a JSON file and returns a populated Registry.
+// The Registry remembers path and writes back to it (best-effort) whenever
+// Upsert adds or replaces a server — e.g. servers an Agent auto-registers —
+// so they survive a Backend restart instead of only existing in memory.
 func LoadFromFile(path string) (*Registry, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -75,6 +80,7 @@ func LoadFromFile(path string) (*Registry, error) {
 		return nil, fmt.Errorf("registry: parse %q: %w", path, err)
 	}
 	reg := NewMemoryRegistry()
+	reg.filePath = path
 	for _, s := range f.Servers { //nolint:gocritic
 		if s.Status == "" {
 			s.Status = "online"
@@ -82,6 +88,14 @@ func LoadFromFile(path string) (*Registry, error) {
 		reg.servers[s.ID] = s
 	}
 	return reg, nil
+}
+
+// SetManifestStore replaces the Registry's manifest store — used to swap in
+// a disk-backed manifest.Store (see manifest.NewDiskStore) after construction.
+func (r *Registry) SetManifestStore(m *manifest.Store) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.manifests = m
 }
 
 // UpsertManifest stores a new versioned manifest for serverID (pushed by Agent).
@@ -120,11 +134,34 @@ func (r *Registry) Get(id string) (*ServerRecord, bool) {
 	return s, ok
 }
 
-// Upsert adds or replaces a server record.
-func (r *Registry) Upsert(s *ServerRecord) {
+// Upsert adds or replaces a server record and writes the registry back to
+// disk (if loaded via LoadFromFile) so the change survives a restart.
+// Returns any write-back error; the in-memory update always succeeds.
+func (r *Registry) Upsert(s *ServerRecord) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.servers[s.ID] = s
+	return r.saveLocked()
+}
+
+// saveLocked writes the current server list to r.filePath. Caller must hold
+// r.mu. No-op when the Registry wasn't loaded from a file.
+func (r *Registry) saveLocked() error {
+	if r.filePath == "" {
+		return nil
+	}
+	servers := make([]*ServerRecord, 0, len(r.servers))
+	for _, s := range r.servers {
+		servers = append(servers, s)
+	}
+	data, err := json.MarshalIndent(registryFile{Servers: servers}, "", "  ")
+	if err != nil {
+		return fmt.Errorf("registry: marshal: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(r.filePath), 0o755); err != nil {
+		return fmt.Errorf("registry: mkdir: %w", err)
+	}
+	return os.WriteFile(r.filePath, data, 0o644)
 }
 
 // RecordHeartbeat updates the agent state for serverID.

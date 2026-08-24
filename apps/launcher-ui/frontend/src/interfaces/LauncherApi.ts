@@ -8,4 +8,5 @@ export interface LauncherApi {
   stopGame(): Promise<void>;
   isGameRunning(): Promise<boolean>;
   getSessionStatus(sessionId: string): Promise<SessionStatus>;
+  repairCache(): Promise<void>;
 }

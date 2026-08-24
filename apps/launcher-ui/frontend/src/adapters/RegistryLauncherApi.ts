@@ -102,4 +102,11 @@ export class RegistryLauncherApi implements LauncherApi {
   async getSessionStatus(sessionId: string): Promise<SessionStatus> {
     return { sessionId, state: 'complete', progress: 100 };
   }
+
+  async repairCache(): Promise<void> {
+    // Cache repair operates on the desktop app's local filesystem cache —
+    // there's nothing to repair when running against the Registry/dev-api
+    // backend directly (no local Go-managed cache dir in this mode).
+    return Promise.resolve();
+  }
 }

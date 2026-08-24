@@ -24,6 +24,7 @@ import (
 	"pzlauncher/apps/backend/internal/api"
 	"pzlauncher/apps/backend/internal/auth"
 	"pzlauncher/apps/backend/internal/content"
+	"pzlauncher/apps/backend/internal/manifest"
 	"pzlauncher/apps/backend/internal/obs"
 	"pzlauncher/apps/backend/internal/registry"
 	"pzlauncher/apps/backend/internal/storage"
@@ -41,6 +42,8 @@ type options struct {
 	DeployDir    string
 	NoAuth       bool
 	LogFile      string
+	TokensFile   string
+	ManifestsDir string
 }
 
 func main() {
@@ -52,6 +55,8 @@ func main() {
 	deployDir := flag.String("deploy", "", "directory to serve under /releases/ and /install-agent.sh (optional)")
 	noAuth := flag.Bool("no-auth", false, "disable agent token auth (dev/test only)")
 	logFile := flag.String("logfile", "", "append logs to this file instead of stderr")
+	tokensFile := flag.String("tokens", "apps/backend/agent-tokens.json", "path to persist agent access tokens (survives restarts)")
+	manifestsDir := flag.String("manifests-dir", "apps/backend/manifests", "directory to persist versioned server manifests (survives restarts)")
 	service := flag.String("service", "", "Windows service control: install | uninstall | start | stop")
 	flag.Parse()
 
@@ -64,6 +69,8 @@ func main() {
 		DeployDir:    *deployDir,
 		NoAuth:       *noAuth,
 		LogFile:      *logFile,
+		TokensFile:   *tokensFile,
+		ManifestsDir: *manifestsDir,
 	}
 
 	if *service != "" {
@@ -115,6 +122,13 @@ func run(ctx context.Context, o options) error {
 		reg = registry.NewMemoryRegistry()
 	}
 
+	manifests, err := manifest.NewDiskStore(o.ManifestsDir)
+	if err != nil {
+		obs.LogError(ctx, "manifests.load_failed", "path", o.ManifestsDir, "error", err)
+		return fmt.Errorf("manifests: %w", err)
+	}
+	reg.SetManifestStore(manifests)
+
 	baseURL := addrToBaseURL(o.Addr)
 
 	store, err := storage.NewDiskStore(o.StoreDir)
@@ -126,7 +140,11 @@ func run(ctx context.Context, o options) error {
 
 	var tokens *auth.Store
 	if !o.NoAuth {
-		tokens = auth.NewStore()
+		tokens, err = auth.NewPersistentStore(o.TokensFile)
+		if err != nil {
+			obs.LogError(ctx, "tokens.load_failed", "path", o.TokensFile, "error", err)
+			return fmt.Errorf("tokens: %w", err)
+		}
 	}
 
 	contentReg, err := content.NewRegistry(o.ContentFile, content.DefaultThreshold)
@@ -190,6 +208,8 @@ func serviceConfig(o options) winsvc.Config {
 		"-store", o.StoreDir,
 		"-content-registry", o.ContentFile,
 		"-fixtures", o.FixturesDir,
+		"-tokens", o.TokensFile,
+		"-manifests-dir", o.ManifestsDir,
 	}
 	if o.DeployDir != "" {
 		args = append(args, "-deploy", o.DeployDir)

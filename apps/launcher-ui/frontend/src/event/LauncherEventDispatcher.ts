@@ -5,7 +5,32 @@ import { useSessionStore } from '../stores/session.store';
 import { useServersStore } from '../stores/servers.store';
 import { usePatchFailureLog } from '../stores/patchFailureLog.store';
 import { useEventLog } from '../stores/eventLog.store';
+import { useSnapshotStore } from '../stores/snapshotStore';
 import { reduceLauncherEvent, validateLauncherEventPatch, LauncherEventPatch, TraceNodePayload } from './LauncherStateReducer';
+import { SnapshotEngine } from './SnapshotEngine';
+import { PerformanceBoundaries } from './PerformanceBoundaries';
+
+// maybeCreateSnapshot creates a state snapshot every SNAPSHOT_INTERVAL events
+// per session (RFC-0025), so StateReconstructor/EventReplay can start from a
+// recent snapshot instead of replaying the full event history. Runs after an
+// event has been successfully applied.
+function maybeCreateSnapshot(sessionId: string) {
+  if (!sessionId) return;
+  const eventLog = useEventLog.getState();
+  const snapshotStore = useSnapshotStore.getState();
+
+  const eventNumber = eventLog.getEntriesBySession(sessionId).length;
+  const latest = snapshotStore.getLatestSnapshot(sessionId);
+  const eventsSinceLastSnapshot = eventNumber - (latest?.eventNumber ?? 0);
+
+  if (!PerformanceBoundaries.shouldCreateSnapshot(eventsSinceLastSnapshot)) {
+    return;
+  }
+
+  const snapshot = SnapshotEngine.createSnapshot(sessionId, eventNumber);
+  snapshotStore.addSnapshot(snapshot);
+  snapshotStore.removeOldSnapshots(sessionId, PerformanceBoundaries.MAX_SNAPSHOTS_PER_SESSION);
+}
 
 function addTraceEvents(sessionId: string, event: LauncherEvent, nodes: TraceNodePayload[]) {
   const traceStore = useTraceStore.getState();
@@ -181,4 +206,6 @@ export function dispatchLauncherEvent(event: LauncherEvent) {
     status: 'applied',
     sessionId: event.sessionId,
   });
+
+  maybeCreateSnapshot(event.sessionId);
 }

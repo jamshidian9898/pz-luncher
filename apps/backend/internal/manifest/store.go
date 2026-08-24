@@ -2,16 +2,25 @@
 //
 // Design constraints (B4):
 //   - Versions are sequential integers (1, 2, 3 …). "Latest" is always max.
-//   - Storage is in-memory for Phase B. Disk persistence is B2/Phase-C scope.
 //   - Diff is computed deterministically from SHA256 identity: if SHA256
 //     matches, the mod is considered identical regardless of name or version.
 //   - History is bounded to MaxVersions per server to avoid unbounded growth.
 //   - All operations are safe for concurrent use.
+//   - Optionally persisted to disk (one JSON file per server, in dir) so a
+//     Backend restart doesn't lose every manifest an Agent has ever pushed —
+//     without this, join.Resolve falls back to an empty download plan for
+//     every server until its Agent happens to republish. NewStore keeps the
+//     old in-memory-only behavior for callers that don't need persistence
+//     (e.g. unit tests); NewDiskStore adds it.
 package manifest
 
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -71,15 +80,120 @@ type VersionSummary struct {
 type Store struct {
 	mu      sync.RWMutex
 	servers map[string]*serverHistory
+	dir     string // "" = in-memory only, no persistence
 }
 
 type serverHistory struct {
 	versions []*VersionRecord // ordered oldest→newest, capped at MaxVersions
 }
 
-// NewStore creates an empty versioned manifest store.
+// NewStore creates an empty, in-memory-only versioned manifest store.
 func NewStore() *Store {
 	return &Store{servers: make(map[string]*serverHistory)}
+}
+
+// NewDiskStore creates a versioned manifest store backed by dir — one JSON
+// file per server, loaded on startup and rewritten on every Put. Errors
+// reading an individual server's file are logged-equivalent (returned only
+// for I/O failures other than "file doesn't exist yet"); a corrupt file for
+// one server does not prevent the others from loading.
+func NewDiskStore(dir string) (*Store, error) {
+	s := &Store{servers: make(map[string]*serverHistory), dir: dir}
+	if dir == "" {
+		return s, nil
+	}
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return s, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("manifest: read dir %q: %w", dir, err)
+	}
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		if err := s.loadServerFile(filepath.Join(dir, e.Name())); err != nil {
+			return nil, fmt.Errorf("manifest: load %q: %w", e.Name(), err)
+		}
+	}
+	return s, nil
+}
+
+// persistedVersion is the on-disk representation of one VersionRecord.
+type persistedVersion struct {
+	Version     int             `json:"version"`
+	Raw         json.RawMessage `json:"raw"`
+	PublishedAt time.Time       `json:"publishedAt"`
+}
+
+func (s *Store) loadServerFile(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var persisted []persistedVersion
+	if err := json.Unmarshal(data, &persisted); err != nil {
+		return err
+	}
+	if len(persisted) == 0 {
+		return nil
+	}
+	serverID := strings.TrimSuffix(filepath.Base(path), ".json")
+	h := &serverHistory{versions: make([]*VersionRecord, 0, len(persisted))}
+	for _, pv := range persisted {
+		var m Manifest
+		if err := json.Unmarshal(pv.Raw, &m); err != nil {
+			return fmt.Errorf("version %d: %w", pv.Version, err)
+		}
+		h.versions = append(h.versions, &VersionRecord{
+			Version:     pv.Version,
+			Manifest:    &m,
+			Raw:         []byte(pv.Raw),
+			PublishedAt: pv.PublishedAt,
+		})
+	}
+	s.servers[serverID] = h
+	return nil
+}
+
+// manifestFileName maps a serverID to a safe on-disk filename.
+var manifestFileNameRe = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
+
+func manifestFileName(serverID string) string {
+	safe := manifestFileNameRe.ReplaceAllString(serverID, "_")
+	if safe == "" {
+		safe = "default"
+	}
+	return safe + ".json"
+}
+
+// persistLocked writes serverID's full version history to disk.
+// Caller must hold s.mu (write lock). No-op when s.dir is "".
+func (s *Store) persistLocked(serverID string) error {
+	if s.dir == "" {
+		return nil
+	}
+	h, ok := s.servers[serverID]
+	if !ok {
+		return nil
+	}
+	out := make([]persistedVersion, 0, len(h.versions))
+	for _, rec := range h.versions {
+		out = append(out, persistedVersion{
+			Version:     rec.Version,
+			Raw:         json.RawMessage(rec.Raw),
+			PublishedAt: rec.PublishedAt,
+		})
+	}
+	data, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(s.dir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(s.dir, manifestFileName(serverID)), data, 0o644)
 }
 
 // agentManifest is a flexible parse target for Agent-submitted manifests.
@@ -151,6 +265,10 @@ func (s *Store) Put(serverID string, rawJSON []byte) (int, error) {
 	// Trim to MaxVersions.
 	if len(h.versions) > MaxVersions {
 		h.versions = h.versions[len(h.versions)-MaxVersions:]
+	}
+
+	if err := s.persistLocked(serverID); err != nil {
+		return nextVer, fmt.Errorf("manifest: persist: %w", err)
 	}
 
 	return nextVer, nil

@@ -31,7 +31,7 @@ function App() {
   const { sessions } = useDownloadsStore();
   const launchState   = useSessionStore((s) => s.launchState);
   const currentServer = useSessionStore((s) => s.currentServer);
-  const { fetchSettings, settings } = useSettingsStore();
+  const { fetchSettings } = useSettingsStore();
 
   // First Run: show wizard if gamePath is empty
   useEffect(() => {
@@ -84,8 +84,7 @@ function App() {
   };
 
   const handleRepairCache = async () => {
-    // RFC-0040: repair cache via settings reset — placeholder for now
-    alert('Cache repair: clear ' + (settings?.cacheLocation || './cache') + ' and retry.');
+    await launcherApi.repairCache();
   };
 
   const handleLaunchServer = async (server: ServerInfo) => {
