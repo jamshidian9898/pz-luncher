@@ -18,6 +18,11 @@ sessions/
 
 # Built binaries in root
 /launcher-ui
+/agent
+/backend
+/dev-api
+/launcher-core
+/main
 
 # Build artifacts
 /tmp/
@@ -40,6 +45,9 @@ coverage.out
 # IDE
 .idea/
 *.iml
+.claude/
+.cursor/
+.agent.md
 
 # OS
 Thumbs.db
