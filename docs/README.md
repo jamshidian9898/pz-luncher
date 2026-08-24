@@ -51,6 +51,6 @@
 
 Strategic decision stack (Path A/B/C) — **decision made (Path A)**:
 
-- `../ARCHITECTURAL_DECISION.md`, `../DECISION_GUIDE.md`, `../README_START_HERE.md`
+- `archive/ARCHITECTURAL_DECISION.md`, `archive/DECISION_GUIDE.md`, `archive/README_START_HERE.md`
 
 Do not use for day-to-day execution unless revisiting strategy.

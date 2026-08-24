@@ -132,7 +132,7 @@ launch args, and byte-identical mod content), `status`, `down`, `clean`.
 
 ## Platform validation (optional, parallel)
 
-Go campaign/SLO work in [STOP.md](../STOP.md) can continue in background; product path does not block on 1000-run campaign.
+Go campaign/SLO work in [STOP.md](archive/STOP.md) can continue in background; product path does not block on 1000-run campaign.
 
 ---
 
