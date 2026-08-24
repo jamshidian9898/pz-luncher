@@ -234,6 +234,19 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 			writeError(w, http.StatusInternalServerError, "BLOB_STORE_ERROR", err.Error())
 			return
 		}
+		// Best-effort operator metadata: who uploaded it and when.
+		sourceServer := ""
+		if tokens != nil {
+			if id, ok := tokens.Validate(r.Header.Get(auth.TokenHeader)); ok {
+				sourceServer = id
+			}
+		}
+		if err := store.Annotate(sha256hex, storage.BlobMeta{
+			SourceServer: sourceServer,
+			UploadedAt:   time.Now().UTC(),
+		}); err != nil {
+			obs.LogError(r.Context(), "store.annotate_failed", "sha256", sha256hex[:12], "error", err)
+		}
 		metrics.BlobUploadTotal.Inc()
 		if cl, err2 := strconv.ParseInt(r.Header.Get("Content-Length"), 10, 64); err2 == nil && cl > 0 {
 			metrics.BlobUploadBytes.Add(float64(cl))
@@ -244,6 +257,28 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 		)
 		w.WriteHeader(http.StatusCreated)
 	}))
+
+	// Content store browser — GET /api/v1/blobs (RFC-0057, admin UI)
+	mux.HandleFunc("GET /api/v1/blobs", func(w http.ResponseWriter, _ *http.Request) {
+		if store == nil {
+			writeError(w, http.StatusServiceUnavailable, "STORE_NOT_CONFIGURED", "content store not available")
+			return
+		}
+		blobs, err := store.List()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "BLOB_LIST_ERROR", err.Error())
+			return
+		}
+		var totalBytes int64
+		for _, b := range blobs {
+			totalBytes += b.SizeBytes
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"blobs":      blobs,
+			"count":      len(blobs),
+			"totalBytes": totalBytes,
+		})
+	})
 
 	// Agent manifest ingestion — PUT /api/v1/manifests/{serverId} (A5, auth A6, versioned B4)
 	mux.HandleFunc("PUT /api/v1/manifests/{serverId}", agentAuth(func(w http.ResponseWriter, r *http.Request) {

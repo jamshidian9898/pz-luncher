@@ -32,9 +32,9 @@ type BlobMeta struct {
 
 // BlobInfo is one entry in a store listing.
 type BlobInfo struct {
-	SHA256     string `json:"sha256"`
-	SizeBytes  int64  `json:"sizeBytes"`
-	SourceServer string `json:"sourceServer,omitempty"`
+	SHA256       string    `json:"sha256"`
+	SizeBytes    int64     `json:"sizeBytes"`
+	SourceServer string    `json:"sourceServer,omitempty"`
 	FirstSeenAt  time.Time `json:"firstSeenAt,omitempty"`
 }
 
