@@ -152,11 +152,13 @@ export default function TokenManager() {
               <div key={t.serverId} className="flex items-center justify-between px-4 py-3 hover:bg-slate-700/30 transition-colors">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-slate-200 font-mono">{t.serverId}</div>
-                  {t.agentStatus && (
-                    <div className="text-xs text-slate-500 mt-0.5">
+                  <div className="text-xs mt-0.5">
+                    {t.agentStatus ? (
                       <StatusBadge status={t.agentStatus} />
-                    </div>
-                  )}
+                    ) : (
+                      <span className="text-slate-600 italic">no agent connected yet</span>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={() => handleRevoke(t.serverId)}

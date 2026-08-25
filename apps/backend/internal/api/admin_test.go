@@ -209,3 +209,40 @@ func TestDownload_IncrementsBlobDownloadCount(t *testing.T) {
 	}
 	_ = tokensStore
 }
+
+func TestAdminToken_IssueDoesNotCreatePhantomOnlineAgent(t *testing.T) {
+	mux, _, reg := newAdminTestRouter(t)
+	hdr := map[string]string{adminHeader: adminSecret}
+
+	if got := doAuth(t, mux, "POST", "/api/v1/admin/tokens/pz-ghost", hdr).Code; got != http.StatusCreated {
+		t.Fatalf("issue: expected 201, got %d", got)
+	}
+	if ag := reg.AgentStateFor("pz-ghost"); ag != nil {
+		t.Fatalf("issuing a token must not create agent state, got %+v", ag)
+	}
+
+	// The issued token must still appear in the admin list (token-only entry).
+	rec := doAuth(t, mux, "GET", "/api/v1/admin/tokens", hdr)
+	var listed struct {
+		Tokens []struct {
+			ServerID    string `json:"serverId"`
+			HasToken    bool   `json:"hasToken"`
+			AgentStatus string `json:"agentStatus"`
+		} `json:"tokens"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &listed); err != nil {
+		t.Fatalf("list decode: %v", err)
+	}
+	var found bool
+	for _, e := range listed.Tokens {
+		if e.ServerID == "pz-ghost" {
+			found = true
+			if !e.HasToken || e.AgentStatus != "" {
+				t.Fatalf("expected token-only entry (no status), got %+v", e)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("pz-ghost missing from admin list: %+v", listed.Tokens)
+	}
+}

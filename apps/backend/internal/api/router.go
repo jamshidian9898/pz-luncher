@@ -449,7 +449,9 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 			writeError(w, http.StatusBadRequest, "TOKEN_ISSUE_ERROR", err.Error())
 			return
 		}
-		reg.RecordHeartbeat(serverID, 0, "")
+		// NOTE: no RecordHeartbeat here — issuing a token must not create a
+		// phantom "online" agent. The registry entry appears when the real
+		// agent first registers/heartbeats.
 		obs.Log(r.Context(), "admin.token_issued", "server_id", serverID)
 		writeJSON(w, http.StatusCreated, map[string]string{"serverId": serverID, "token": token})
 	}))
