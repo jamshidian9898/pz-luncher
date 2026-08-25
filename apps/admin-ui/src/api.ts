@@ -74,6 +74,7 @@ export interface BlobInfo {
   sizeBytes: number
   sourceServer?: string
   firstSeenAt?: string
+  downloads?: number
 }
 
 export interface BlobList {

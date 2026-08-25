@@ -1,0 +1,20 @@
+# Admin UI testing override — enables agent auth + admin API on the test stack.
+#
+# Usage:
+#   PZ_ADMIN_TOKEN=dev-admin docker compose -f docker-compose.test.yml -f docker-compose.admin.yml up -d --build backend
+#   make fake-agents-down && make fake-agents-up   # agents re-register for real tokens
+#
+# Then run the admin UI:
+#   cd apps/admin-ui && npm run dev                # http://localhost:5174
+# Paste the admin token into the Tokens page.
+
+services:
+  backend:
+    command:
+      - -addr=:8080
+      - -registry=/app/registry.json
+      - -store=/data/store
+      - -fixtures=/app/fixtures
+      - -tokens=/data/tokens.json
+      - -manifests-dir=/data/manifests
+      - -admin-token=${PZ_ADMIN_TOKEN:-dev-admin}

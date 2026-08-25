@@ -160,3 +160,52 @@ func TestBlobs_ListAfterUploadRecordsSource(t *testing.T) {
 		t.Fatalf("blob mismatch: %+v", b)
 	}
 }
+
+func TestDownload_IncrementsBlobDownloadCount(t *testing.T) {
+	mux, tokensStore, _ := newAdminTestRouter(t)
+
+	regRec := doJSON(t, mux, "POST", "/api/v1/agents/register", map[string]string{"serverId": "pz-dl-1"})
+	var reg struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(regRec.Body.Bytes(), &reg); err != nil || reg.Token == "" {
+		t.Fatalf("register: %q", regRec.Body.String())
+	}
+
+	content := "download-stats-payload"
+	sum := sha256.Sum256([]byte(content))
+	sha := hex.EncodeToString(sum[:])
+	req := httptest.NewRequest("PUT", "/api/v1/blobs/"+sha, strings.NewReader(content))
+	req.Header.Set(auth.TokenHeader, reg.Token)
+	upRec := httptest.NewRecorder()
+	mux.ServeHTTP(upRec, req)
+	if upRec.Code != http.StatusCreated {
+		t.Fatalf("upload: got %d", upRec.Code)
+	}
+
+	for i := 0; i < 3; i++ {
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/download/"+sha, nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("download %d: got %d", i, rec.Code)
+		}
+		if got := rec.Body.String(); got != content {
+			t.Fatalf("download %d body mismatch: %q", i, got)
+		}
+	}
+
+	list := doJSON(t, mux, "GET", "/api/v1/blobs", nil)
+	var decoded struct {
+		Blobs []struct {
+			SHA256    string `json:"sha256"`
+			Downloads int64  `json:"downloads"`
+		} `json:"blobs"`
+	}
+	if err := json.Unmarshal(list.Body.Bytes(), &decoded); err != nil {
+		t.Fatalf("blobs decode: %v", err)
+	}
+	if len(decoded.Blobs) != 1 || decoded.Blobs[0].Downloads != 3 {
+		t.Fatalf("expected downloads=3, got %+v", decoded.Blobs)
+	}
+	_ = tokensStore
+}

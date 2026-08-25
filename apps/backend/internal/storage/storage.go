@@ -28,6 +28,7 @@ var ErrNotFound = errors.New("blob not found")
 type BlobMeta struct {
 	SourceServer string    `json:"sourceServer,omitempty"`
 	UploadedAt   time.Time `json:"uploadedAt,omitempty"`
+	Downloads    int64     `json:"downloads,omitempty"`
 }
 
 // BlobInfo is one entry in a store listing.
@@ -36,6 +37,7 @@ type BlobInfo struct {
 	SizeBytes    int64     `json:"sizeBytes"`
 	SourceServer string    `json:"sourceServer,omitempty"`
 	FirstSeenAt  time.Time `json:"firstSeenAt,omitempty"`
+	Downloads    int64     `json:"downloads,omitempty"`
 }
 
 // Store is the content-addressable blob store interface.
@@ -58,6 +60,11 @@ type Store interface {
 	// Annotate records operator-facing metadata for a blob. Best-effort:
 	// implementations may ignore it; missing metadata must never break ingestion.
 	Annotate(sha256hex string, meta BlobMeta) error
+
+	// RecordDownload increments the persisted download counter for a blob.
+	// Best-effort: implementations may ignore it; counting must never fail
+	// a download.
+	RecordDownload(sha256hex string)
 
 	// List returns every blob in the store with whatever metadata is known.
 	List() ([]BlobInfo, error)
@@ -198,9 +205,22 @@ func (d *DiskStore) Annotate(sha256hex string, meta BlobMeta) error {
 		if meta.UploadedAt.IsZero() {
 			meta.UploadedAt = prev.UploadedAt
 		}
+		if meta.Downloads == 0 {
+			meta.Downloads = prev.Downloads
+		}
 	}
 	d.index[sha256hex] = meta
 	return d.saveIndex()
+}
+
+// RecordDownload increments the persisted download counter (best-effort).
+func (d *DiskStore) RecordDownload(sha256hex string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	meta := d.index[sha256hex]
+	meta.Downloads++
+	d.index[sha256hex] = meta
+	_ = d.saveIndex()
 }
 
 // List returns every blob on disk merged with any known metadata,
@@ -234,6 +254,7 @@ func (d *DiskStore) List() ([]BlobInfo, error) {
 		if meta, ok := idx[name]; ok {
 			info.SourceServer = meta.SourceServer
 			info.FirstSeenAt = meta.UploadedAt
+			info.Downloads = meta.Downloads
 		}
 		out = append(out, info)
 		return nil

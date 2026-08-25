@@ -135,7 +135,6 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 			writeError(w, http.StatusInternalServerError, "DOWNLOAD_ERROR", err.Error())
 			return
 		}
-		defer rc.Close()
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("X-Content-SHA256", sha256hex)
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
@@ -144,6 +143,8 @@ func NewRouter(reg *registry.Registry, baseURL string, store storage.Store, toke
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.Copy(w, rc)
+		rc.Close()
+		store.RecordDownload(sha256hex) // best-effort operator stat
 		metrics.BlobDownloadTotal.Inc()
 	})
 

@@ -187,3 +187,32 @@ func TestAnnotate_PersistsAcrossStoreInstances(t *testing.T) {
 		t.Fatalf("metadata not persisted: %+v", list)
 	}
 }
+
+func TestRecordDownload_CountsAndPersists(t *testing.T) {
+	dir := t.TempDir()
+	store, _ := NewDiskStore(dir)
+	hash := sha256Hex("counted-blob")
+	if err := store.Put(hash, strings.NewReader("counted-blob")); err != nil {
+		t.Fatalf("put: %v", err)
+	}
+
+	store.RecordDownload(hash)
+	store.RecordDownload(hash)
+
+	list, err := store.List()
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(list) != 1 || list[0].Downloads != 2 {
+		t.Fatalf("expected 1 blob with Downloads=2, got %+v", list)
+	}
+
+	reopened, _ := NewDiskStore(dir)
+	list2, err := reopened.List()
+	if err != nil {
+		t.Fatalf("reopen list: %v", err)
+	}
+	if len(list2) != 1 || list2[0].Downloads != 2 {
+		t.Fatalf("counter not persisted across reopen: %+v", list2)
+	}
+}

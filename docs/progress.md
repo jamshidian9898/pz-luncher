@@ -115,7 +115,7 @@ launch args, and byte-identical mod content), `status`, `down`, `clean`.
 
 ## Next
 
-- [ ] Flesh out Admin UI (0057) beyond basic screens
+- [x] Flesh out Admin UI (0057) — complete 2026-08-25 (content browser, token mgmt, manifest viewer, download stats)
 - [ ] Run a real-environment test pass on actual hardware using the labs above
 - [ ] Error strings in UI for pipeline codes
 

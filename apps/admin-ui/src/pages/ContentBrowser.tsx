@@ -85,10 +85,11 @@ export default function ContentBrowser() {
       {/* Blob table */}
       {!error && (
         <div className="bg-slate-800/60 rounded-xl border border-slate-700/50 divide-y divide-slate-700/40">
-          <div className="grid grid-cols-[1fr_90px_140px_110px] gap-3 px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          <div className="grid grid-cols-[1fr_90px_140px_70px_110px] gap-3 px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
             <span>SHA256</span>
             <span className="text-right">Size</span>
             <span>Source</span>
+            <span className="text-right">DLs</span>
             <span className="text-right">First Seen</span>
           </div>
           {filtered.length === 0 ? (
@@ -97,7 +98,7 @@ export default function ContentBrowser() {
             </div>
           ) : (
             filtered.map(b => (
-              <div key={b.sha256} className="grid grid-cols-[1fr_90px_140px_110px] gap-3 px-4 py-2.5 items-center hover:bg-slate-700/30 transition-colors">
+              <div key={b.sha256} className="grid grid-cols-[1fr_90px_140px_70px_110px] gap-3 px-4 py-2.5 items-center hover:bg-slate-700/30 transition-colors">
                 <a
                   href={`/api/v1/download/${b.sha256}`}
                   target="_blank"
@@ -109,6 +110,9 @@ export default function ContentBrowser() {
                 </a>
                 <span className="text-xs text-slate-400 text-right">{formatSize(b.sizeBytes)}</span>
                 <span className="text-xs text-slate-400 truncate">{b.sourceServer || '—'}</span>
+                <span className={`text-xs text-right ${b.downloads ? 'text-indigo-300' : 'text-slate-600'}`}>
+                  {b.downloads ?? 0}
+                </span>
                 <span className="text-xs text-slate-500 text-right">
                   {b.firstSeenAt ? new Date(b.firstSeenAt).toLocaleDateString() : '—'}
                 </span>
